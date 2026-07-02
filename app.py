@@ -13,10 +13,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS Injection: Targets the main layout, sidebar background, and the selection tabs
+# Custom CSS Injection: Targets layout, sidebar, active tabs, and glowing yellow sidebar text
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght=400;600;700&family=Syne:wght=700;800&family=Inter:wght=400;500;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght=400;600;700&family=Syne:wght=700;800&family=Inter:wght=400;500;600;700&display=swap');
     
     /* Main App Deep Dark Background */
     .stApp {
@@ -24,12 +24,28 @@ st.markdown("""
         color: #F1F5F9 !important;
     }
     
-    /* COMPATIBLE BLACK SIDEBAR TARGET */
+    /* Compatible Black Sidebar Target */
     [data-testid="stSidebar"] {
         background-color: #090D16 !important;
         border-right: 1px solid #1E293B !important;
     }
     
+    /* GLOWING SHINY REFLECTIVE YELLOW SIDEBAR DEPARTMENT LABELS */
+    [data-testid="stSidebar"] .stRadio [data-testid="stWidgetLabel"] + div label p {
+        font-family: 'Space Grotesk', sans-serif !important;
+        color: #FBBF24 !important;
+        font-weight: 700 !important;
+        font-size: 1.1rem !important;
+        text-shadow: 0px 0px 8px rgba(251, 191, 36, 0.6) !important;
+        transition: all 0.2s ease;
+    }
+    
+    /* Hover effect for an extra reflective sheen */
+    [data-testid="stSidebar"] .stRadio [data-testid="stWidgetLabel"] + div label:hover p {
+        color: #FFE082 !important;
+        text-shadow: 0px 0px 14px rgba(251, 191, 36, 0.9) !important;
+    }
+
     /* Main App Header Text styling */
     .main h1 {
         font-family: 'Syne', sans-serif;
@@ -208,15 +224,16 @@ with tab_dash:
         st.markdown("<h2 style='font-family:\"Syne\"; color:#38BDF8; margin-top:0;'>🎨 Control Room</h2>", unsafe_allow_html=True)
         st.markdown("<hr style='border-color: #1E293B;'/>", unsafe_allow_html=True)
         
-        st.markdown("<b style='color:#F1F5F9;'>Select Target Filter Profile:</b>", unsafe_allow_html=True)
+        st.markdown("<b style='color:#F1F5F9; font-size: 0.95rem;'>Select Target Filter Profile:</b>", unsafe_allow_html=True)
         selected_dept = st.radio(
             label="Target Departments Filter",
             options=['All Matrix Mix'] + list(DEPARTMENT_QUESTIONS.keys()),
-            key="dash_dept_radio"
+            key="dash_dept_radio",
+            label_visibility="collapsed"
         )
         
         st.markdown("<hr style='border-color: #1E293B;'/>", unsafe_allow_html=True)
-        st.markdown("<b style='color:#F1F5F9;'>Demographic Filtering Crosstab:</b>", unsafe_allow_html=True)
+        st.markdown("<b style='color:#F1F5F9; font-size: 0.95rem;'>Demographic Filtering Crosstab:</b>", unsafe_allow_html=True)
         selected_tenure = st.segmented_control(
             label="Employee Tenure Filter",
             options=['All Mix'] + list(df['Tenure'].unique()),
