@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PIQA Internal Customer Satisfaction Survey</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .likert-radio:checked + label {
+            background-color: #2563eb;
+            color: white;
+            border-color: #2563eb;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-blue-900 text-white shadow-md sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 class="text-xl font-bold tracking-wide">TIRE MANUFACTURING CORPORATION</h1>
+                <p class="text-xs text-blue-200">Process Integration & Quality Assurance (PIQA) Department Survey</p>
+            </div>
+            <span class="bg-blue-800 text-xs text-blue-100 px-3 py-1.5 rounded-full font-medium border border-blue-700">Internal Customer Evaluation</span>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-grow max-w-6xl w-full mx-auto px-4 py-8">
+        
+        <!-- Welcome Message & Instructions -->
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-8">
+            <h2 class="text-lg font-bold text-gray-900 mb-2">Internal Customer Satisfaction Survey</h2>
+            <p class="text-sm text-gray-600 leading-relaxed mb-4">
+                This survey is designed to evaluate the satisfaction levels of our internal customers and staff. 
+                The output will help improve our workflows, workplace environment, and service delivery. Please provide your honest feedback.
+            </p>
+            <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-r-lg">
+                <p class="text-xs text-blue-800 font-semibold mb-1">Rating Scale Key:</p>
+                <div class="grid grid-cols-5 gap-2 text-center text-xs font-medium text-blue-900">
+                    <div class="p-1.5 bg-white rounded border border-blue-100">1 - Strongly Disagree</div>
+                    <div class="p-1.5 bg-white rounded border border-blue-100">2 - Disagree</div>
+                    <div class="p-1.5 bg-white rounded border border-blue-100">3 - Neutral</div>
+                    <div class="p-1.5 bg-white rounded border border-blue-100">4 - Agree</div>
+                    <div class="p-1.5 bg-white rounded border border-blue-100">5 - Strongly Agree</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Department Selection Tabs -->
+        <div class="mb-6">
+            <label class="block text-sm font-semibold text-gray-700 mb-2">Select Your Department / Survey Target:</label>
+            <div class="flex flex-wrap gap-2" id="tab-container">
+                <!-- Dynamic tabs added by JS -->
+            </div>
+        </div>
+
+        <!-- Dynamic Form Container -->
+        <form id="survey-form" class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hidden">
+            <input type="hidden" id="selected-dept" name="department">
+            
+            <div class="p-6 bg-gray-50 border-b border-gray-100">
+                <h3 class="text-lg font-bold text-gray-900" id="form-title">Department Questions</h3>
+                <p class="text-xs text-gray-500 mt-1" id="form-description"></p>
+            </div>
+
+            <!-- Questions Target Wrapper -->
+            <div class="p-6 space-y-6" id="questions-wrapper">
+                <!-- Questions dynamically loaded here -->
+            </div>
+
+            <!-- Open Ended Section -->
+            <div class="p-6 border-t border-gray-100 bg-gray-50/50">
+                <label for="additional_comments" class="block text-sm font-semibold text-gray-800 mb-2">
+                    If you have additional points or recommendations, please specify:
+                </label>
+                <textarea id="additional_comments" name="additional_comments" rows="4" 
+                    class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-3 border" 
+                    placeholder="Type your notes here..."></textarea>
+            </div>
+
+            <!-- Submission Area -->
+            <div class="p-6 border-t border-gray-100 flex justify-end bg-white">
+                <button type="submit" 
+                    class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-lg shadow-sm transition duration-150 ease-in-out text-sm">
+                    Submit Survey Responses
+                </button>
+            </div>
+        </form>
+
+        <!-- Success Message Dashboard Container -->
+        <div id="success-container" class="bg-white rounded-xl shadow-sm p-8 border border-gray-100 text-center hidden max-w-xl mx-auto">
+            <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            </div>
+            <h3 class="text-xl font-bold text-gray-900 mb-2">Thank You!</h3>
+            <p class="text-sm text-gray-600 mb-6">Your survey data has been formatted and successfully packaged for the database.</p>
+            <div class="text-left bg-gray-900 text-green-400 p-4 rounded-lg text-xs font-mono overflow-x-auto max-h-60" id="json-output">
+                <!-- Clean JSON Output displayed here -->
+            </div>
+            <button onclick="window.location.reload()" class="mt-6 inline-block text-sm text-blue-600 font-semibold hover:underline">
+                Submit Another Response
+            </button>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-gray-400 text-xs py-4 border-t border-gray-700">
+        <div class="max-w-6xl mx-auto px-4 text-center">
+            &copy; 2026 Tire Manufacturing Plant • PIQA Department Quality Analytics Toolkit.
+        </div>
+    </footer>
+
+    <!-- Form Configuration Engine -->
+    <script>
+        // Database of Questionnaires 
+        const surveyConfig = {
+            "piqa_staff": {
+                name: "PIQA Employee Staff",
+                desc: "This is a questionnaire for internal employees of PIQA to gauge and improve the workspace and environment.",
+                questions: [
+                    "I have access to all necessary testing equipment and standard references required for my quality checks.",
+                    "The workplace environment is safe, properly ventilated, and optimized for tire calibration tasks.",
+                    "Communication regarding compound adjustments or process modifications is clear and immediate within the shift.",
+                    "Training regarding new tire specifications, structural molds, or machinery updates is consistently provided.",
+                    "The distribution of work shifts and internal audit assignments is fair and sustainable."
+                ]
+            },
+            "plant_engineering": {
+                name: "Plant Engineering Department",
+                desc: "Prepared to evaluate the satisfaction level of our internal customer / Plant Engineering department.",
+                questions: [
+                    "Provide technical data and specification as per the request",
+                    "Cooperation in mould cleaning check up to shorten its change time",
+                    "Communication is on time to deliver the request service",
+                    "Provide support based on request",
+                    "Test result is given for plant engineering on time",
+                    "Active participation in cross functional team to address common plant problems",
+                    "Satisfaction on overall relationship with the department"
+                ]
+            },
+            "production": {
+                name: "Production Department",
+                desc: "Prepared to evaluate the satisfaction level of our internal customer / Production department.",
+                questions: [
+                    "Recipes/Specifications/ Work instructions are updated periodically and understandable for users",
+                    "Helpful work instructions are prepared by considering quality with productivity",
+                    "Root cause analysis & prevention work in collaboration with CFT team",
+                    "There is cooperation with production team to reduce waste",
+                    "Work instructions are prepared based on good practices of the company",
+                    "Recommendations are given for nonconforming Semi finished products on time",
+                    "Materials are released for production as per laboratory testing time and material rest time",
+                    "Gaps seen in the process are highlighted for correction to be taken",
+                    "Providing gap base training as per request for production staffs."
+                ]
+            },
+            "purchasing": {
+                name: "Purchasing Department",
+                desc: "Prepared to evaluate the satisfaction level of our internal customer / Purchasing department.",
+                questions: [
+                    "PIQA provides clear, structured technical specifications for raw material purchases (e.g., rubber compounds, steel cords).",
+                    "Laboratory chemical test results for newly sourced raw material samples are provided within deadline.",
+                    "Supplier non-conformance reports (NCR) are structured objectively to support vendor claims and updates.",
+                    "PIQA acts quickly to assess replacement raw materials when supply chain shortages arise.",
+                    "The overall communication loop and inter-departmental relationship are collaborative and professional."
+                ]
+            },
+            "sales_marketing": {
+                name: "Sales & Marketing Department",
+                desc: "Prepared to evaluate the satisfaction level of our internal customer / Sales and marketing department.",
+                questions: [
+                    "Provide technical data and specification as per the request",
+                    "Response for product quality improvement as per request",
+                    "Communication is on time about new products",
+                    "Provide technical support based on request",
+                    "Claim tire inspection and on time feedback.",
+                    "Actively participating on field and customer support activities",
+                    "Satisfaction on overall relationship with the department"
+                ]
+            },
+            "store_admin": {
+                name: "Store Administration Department",
+                desc: "Prepared by the PIQA Department for the Store Administration Department aiming to know satisfaction levels.",
+                questions: [
+                    "Inspections on incoming raw materials stored in warehouses are completed on time to prevent logistics stagnation.",
+                    "Clear instructions are given regarding green tire/compound holding patterns or material rest timelines.",
+                    "PIQA clearly defines and tags quarantine/non-conforming items in the warehouse inventory mapping.",
+                    "Feedback and approvals for old or prolonged inventory items are processed swiftly.",
+                    "PIQA personnel respect warehouse safety guidelines and spatial layouts during testing sampling routines."
+                ]
+            }
+        };
+
+        const tabContainer = document.getElementById('tab-container');
+        const formElement = document.getElementById('survey-form');
+        const questionsWrapper = document.getElementById('questions-wrapper');
+
+        // Render Tabs dynamically
+        Object.keys(surveyConfig).forEach(key => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = "px-4 py-2 text-xs font-medium rounded-lg border bg-white border-gray-200 text-gray-700 hover:bg-gray-50 transition shadow-sm cursor-pointer";
+            btn.innerText = surveyConfig[key].name;
+            btn.onclick = () => selectDepartment(key, btn);
+            tabContainer.appendChild(btn);
+        });
+
+        // Tab Switching State Machine
+        function selectDepartment(key, element) {
+            // Reset active styles on tabs
+            Array.from(tabContainer.children).forEach(child => {
+                child.className = "px-4 py-2 text-xs font-medium rounded-lg border bg-white border-gray-200 text-gray-700 hover:bg-gray-50 transition shadow-sm cursor-pointer";
+            });
+            // Apply selected styling
+            element.className = "px-4 py-2 text-xs font-medium rounded-lg border bg-blue-600 border-blue-600 text-white shadow-sm cursor-pointer animate-pulse-once";
+
+            // Setup Form Data
+            document.getElementById('selected-dept').value = key;
+            document.getElementById('form-title').innerText = surveyConfig[key].name + " Survey Core Matrix";
+            document.getElementById('form-description').innerText = surveyConfig[key].desc;
+            
+            // Build Question Blocks
+            questionsWrapper.innerHTML = '';
+            surveyConfig[key].questions.forEach((qText, idx) => {
+                const qNum = idx + 1;
+                const questionBlock = document.createElement('div');
+                questionBlock.className = "pb-6 border-b border-gray-100 last:border-b-0";
+                
+                questionBlock.innerHTML = `
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <p class="text-sm font-medium text-gray-800 max-w-2xl"><span class="text-blue-600 font-bold mr-2">${qNum}.</span>${qText}</p>
+                        <div class="flex items-center gap-1.5 self-start md:self-center">
+                            ${[1,2,3,4,5].map(num => `
+                                <div class="relative">
+                                    <input type="radio" id="q_${qNum}_${num}" name="q_${qNum}" value="${num}" required
+                                        class="likert-radio sr-only">
+                                    <label for="q_${qNum}_${num}" 
+                                        class="w-9 h-9 flex items-center justify-center rounded-lg border border-gray-200 text-xs font-semibold text-gray-600 bg-white hover:bg-gray-50 cursor-pointer transition">
+                                        ${num}
+                                    </label>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+                questionsWrapper.appendChild(questionBlock);
+            });
+
+            // Reset text area and show form
+            document.getElementById('additional_comments').value = '';
+            formElement.classList.remove('hidden');
+            document.getElementById('success-container').classList.add('hidden');
+        }
+
+        // Intercept Submission and Package Raw Data Cleanly for your Step 1 Pipeline
+        formElement.onsubmit = function(e) {
+            e.preventDefault();
+            const formData = new FormData(formElement);
+            const deptKey = formData.get('department');
+            
+            const payload = {
+                timestamp: new Date().toISOString(),
+                target_department_id: deptKey,
+                target_department_name: surveyConfig[deptKey].name,
+                metrics: [],
+                qualitative_feedback: formData.get('additional_comments')
+            };
+
+            surveyConfig[deptKey].questions.forEach((qText, idx) => {
+                const score = formData.get(`q_${idx + 1}`);
+                payload.metrics.push({
+                    question_number: idx + 1,
+                    criteria: qText,
+                    score: parseInt(score, 10)
+                });
+            });
+
+            // Hide Form and Show clean Data output ready for reporting analysis
+            formElement.classList.add('hidden');
+            const successContainer = document.getElementById('success-container');
+            const jsonOutput = document.getElementById('json-output');
+            
+            jsonOutput.innerText = JSON.stringify(payload, null, 2);
+            successContainer.classList.remove('hidden');
+            window.scrollTo({ top: successContainer.offsetTop - 100, behavior: 'smooth' });
+        };
+    </script>
+</body>
+</html>
