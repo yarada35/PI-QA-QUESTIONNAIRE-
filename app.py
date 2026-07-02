@@ -13,18 +13,24 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS Injection: ONLY targets the two top tab headers to be big, bold, and reflective!
+# Custom CSS Injection: Targets the main layout, sidebar background, and the selection tabs
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght=400;600;700&family=Syne:wght=700;800&family=Inter:wght=400;500;600&display=swap');
     
-    /* Force main app background wrapper to dark theme */
+    /* Main App Deep Dark Background */
     .stApp {
-        background-color: #0B0F19 !important;
+        background-color: #05070F !important;
         color: #F1F5F9 !important;
     }
     
-    /* Typography Overrides */
+    /* COMPATIBLE BLACK SIDEBAR TARGET */
+    [data-testid="stSidebar"] {
+        background-color: #090D16 !important;
+        border-right: 1px solid #1E293B !important;
+    }
+    
+    /* Main App Header Text styling */
     .main h1 {
         font-family: 'Syne', sans-serif;
         font-weight: 800;
@@ -51,7 +57,7 @@ st.markdown("""
         font-family: 'Inter', sans-serif;
     }
     
-    /* TARGETED FIX: Makes only the two main selection tabs bigger, bolder, and reflective */
+    /* Main selection tabs: Big, Bold, and Reflective */
     .stTabs [data-baseweb="tab-list"] button {
         font-size: 1.6rem !important;
         font-weight: 800 !important;
@@ -60,7 +66,7 @@ st.markdown("""
         font-family: 'Syne', sans-serif !important;
         transition: all 0.3s ease;
     }
-    /* Active reflective neon state when selected */
+    /* Active reflective state when selected */
     .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
         color: #34D399 !important;
         border-bottom: 4px solid #34D399 !important;
@@ -69,17 +75,17 @@ st.markdown("""
     
     /* Premium Glossy Dark Metric Cards */
     .metric-card {
-        background: #1E293B;
+        background: #111827;
         border-radius: 16px;
         padding: 24px;
-        border: 1px solid #334155;
+        border: 1px solid #1E293B;
         border-left: 6px solid #38BDF8;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
     }
 
     .question-block {
-        background: #1E293B;
-        border: 1px solid #334155;
+        background: #111827;
+        border: 1px solid #1E293B;
         border-radius: 12px;
         padding: 20px;
         margin-bottom: 1rem;
@@ -93,7 +99,7 @@ st.markdown("""
     }
 
     .scale-legend {
-        background-color: #111827;
+        background-color: #090D16;
         border: 1px solid #1E293B;
         border-radius: 8px;
         padding: 12px;
@@ -200,7 +206,7 @@ tab_dash, tab_survey = st.tabs(["📊 Live Analytics Dashboard", "📝 Interacti
 with tab_dash:
     with st.sidebar:
         st.markdown("<h2 style='font-family:\"Syne\"; color:#38BDF8; margin-top:0;'>🎨 Control Room</h2>", unsafe_allow_html=True)
-        st.markdown("<hr style='border-color: #334155;'/>", unsafe_allow_html=True)
+        st.markdown("<hr style='border-color: #1E293B;'/>", unsafe_allow_html=True)
         
         st.markdown("<b style='color:#F1F5F9;'>Select Target Filter Profile:</b>", unsafe_allow_html=True)
         selected_dept = st.radio(
@@ -209,7 +215,7 @@ with tab_dash:
             key="dash_dept_radio"
         )
         
-        st.markdown("<hr style='border-color: #334155;'/>", unsafe_allow_html=True)
+        st.markdown("<hr style='border-color: #1E293B;'/>", unsafe_allow_html=True)
         st.markdown("<b style='color:#F1F5F9;'>Demographic Filtering Crosstab:</b>", unsafe_allow_html=True)
         selected_tenure = st.segmented_control(
             label="Employee Tenure Filter",
@@ -262,7 +268,6 @@ with tab_dash:
             template="plotly_dark"
         )
         
-        # --- FIXED PLOTLY LAYOUT CONFIGURATION ERROR HERE ---
         fig_bar.update_layout(
             plot_bgcolor='rgba(0,0,0,0)', 
             paper_bgcolor='rgba(0,0,0,0)', 
