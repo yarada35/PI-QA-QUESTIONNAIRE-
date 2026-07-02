@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS Injection: Targets layout, sidebar, active tabs, and glowing yellow sidebar text
+# Custom CSS Injection: Targets layout, sidebar, active tabs, glowing yellow sidebar text, and print styling
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght=400;600;700&family=Syne:wght=700;800&family=Inter:wght=400;500;600;700&display=swap');
@@ -217,49 +217,50 @@ df = generate_verbatim_survey_dataset()
 st.markdown("<h1>PIQA Matrix Interface Portal</h1>", unsafe_allow_html=True)
 st.markdown("<p style='color:#94A3B8; font-size:1.1rem; margin-bottom: 1.5rem;'>Unified suite for live operational analysis and internal raw feedback collection loops.</p>", unsafe_allow_html=True)
 
-# Main Multi-Tab Layout Layout Selection Space
-tab_dash, tab_survey = st.tabs(["📊 Live Analytics Dashboard", "📝 Interactive Survey Intake"])
+# Main Multi-Tab Layout Layout Selection Space including Print & Share Tab
+tab_dash, tab_survey, tab_print = st.tabs(["📊 Live Analytics Dashboard", "📝 Interactive Survey Intake", "🖨️ Print & Distribution Hub"])
+
+# Global Sidebar Filters
+with st.sidebar:
+    st.markdown("<h2 style='font-family:\"Syne\"; color:#38BDF8; margin-top:0;'>🎨 Control Room</h2>", unsafe_allow_html=True)
+    st.markdown("<hr style='border-color: #1E293B;'/>", unsafe_allow_html=True)
+    
+    st.markdown("<b style='color:#F1F5F9; font-size: 0.95rem;'>Select Target Filter Profile:</b>", unsafe_allow_html=True)
+    selected_dept = st.radio(
+        label="Target Departments Filter",
+        options=['All Matrix Mix'] + list(DEPARTMENT_QUESTIONS.keys()),
+        key="dash_dept_radio",
+        label_visibility="collapsed"
+    )
+    
+    st.markdown("<hr style='border-color: #1E293B;'/>", unsafe_allow_html=True)
+    st.markdown("<b style='color:#F1F5F9; font-size: 0.95rem;'>Demographic Filtering Crosstab:</b>", unsafe_allow_html=True)
+    selected_tenure = st.segmented_control(
+        label="Employee Tenure Filter",
+        options=['All Mix'] + list(df['Tenure'].unique()),
+        default='All Mix',
+        key="dash_tenure_seg"
+    )
+
+# Slice Metrics safely based on dashboard settings
+filtered_df = df.copy()
+if selected_dept != 'All Matrix Mix':
+    filtered_df = filtered_df[filtered_df['Department'] == selected_dept]
+if selected_tenure != 'All Mix':
+    filtered_df = filtered_df[filtered_df['Tenure'] == selected_tenure]
+
+distinct_active_respondents = filtered_df['RespondentID'].nunique()
+avg_score = round(filtered_df['Score'].mean(), 2) if not filtered_df.empty else 0.0
 
 # ==========================================
 # VIEW 1: LIVE ANALYTICS DASHBOARD
 # ==========================================
 with tab_dash:
-    with st.sidebar:
-        st.markdown("<h2 style='font-family:\"Syne\"; color:#38BDF8; margin-top:0;'>🎨 Control Room</h2>", unsafe_allow_html=True)
-        st.markdown("<hr style='border-color: #1E293B;'/>", unsafe_allow_html=True)
-        
-        st.markdown("<b style='color:#F1F5F9; font-size: 0.95rem;'>Select Target Filter Profile:</b>", unsafe_allow_html=True)
-        selected_dept = st.radio(
-            label="Target Departments Filter",
-            options=['All Matrix Mix'] + list(DEPARTMENT_QUESTIONS.keys()),
-            key="dash_dept_radio",
-            label_visibility="collapsed"
-        )
-        
-        st.markdown("<hr style='border-color: #1E293B;'/>", unsafe_allow_html=True)
-        st.markdown("<b style='color:#F1F5F9; font-size: 0.95rem;'>Demographic Filtering Crosstab:</b>", unsafe_allow_html=True)
-        selected_tenure = st.segmented_control(
-            label="Employee Tenure Filter",
-            options=['All Mix'] + list(df['Tenure'].unique()),
-            default='All Mix',
-            key="dash_tenure_seg"
-        )
-
-    # Slice Metrics safely based on dashboard settings
-    filtered_df = df.copy()
-    if selected_dept != 'All Matrix Mix':
-        filtered_df = filtered_df[filtered_df['Department'] == selected_dept]
-    if selected_tenure != 'All Mix':
-        filtered_df = filtered_df[filtered_df['Tenure'] == selected_tenure]
-
     st.markdown(f"<p style='color:#94A3B8;'><b>Active Analytics View:</b> Segment: <span style='color:#38BDF8;'>{selected_dept}</span> | Profile Mix: <span style='color:#34D399;'>{selected_tenure}</span></p>", unsafe_allow_html=True)
     
-    distinct_active_respondents = filtered_df['RespondentID'].nunique()
-
     # Summary KPI Grid
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        avg_score = round(filtered_df['Score'].mean(), 2) if not filtered_df.empty else 0.0
         st.markdown(f'<div class="metric-card"><p style="color:#94A3B8; font-size: 0.8rem; text-transform: uppercase; font-weight:600; margin-bottom:4px;">Composite Mean Score</p><h2 style="font-family:\'Space Grotesk\'; font-size:2.2rem; color:#F8FAFC; margin:0;">{avg_score} <span style="font-size:1.2rem; color:#38BDF8;">/ 5.0</span></h2></div>', unsafe_allow_html=True)
     with col2:
         st.markdown(f'<div class="metric-card" style="border-left-color: #34D399;"><p style="color:#34D399; font-size: 0.8rem; text-transform: uppercase; font-weight:600; margin-bottom:4px;">Total Sample Respondents</p><h2 style="font-family:\'Space Grotesk\'; font-size:2.2rem; color:#F8FAFC; margin:0;">{distinct_active_respondents} <span style="font-size:1.1rem; color:#94A3B8;">Staff</span></h2></div>', unsafe_allow_html=True)
@@ -273,46 +274,18 @@ with tab_dash:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # --- REMOVED THE COLOURED STYLER GRADIENT FROM THE CODE BELOW TO ELIMINATE IMPORT ERROR ---
     st.markdown("<div class='section-title'>📋 Total Number of Respondents Matrix (Observation Breakdown)</div>", unsafe_allow_html=True)
-    
     respondent_matrix = df.groupby(['Department', 'Tenure'])['RespondentID'].nunique().unstack(fill_value=0)
     respondent_matrix['Total Fleet'] = respondent_matrix.sum(axis=1)
-    
-    st.dataframe(
-        respondent_matrix,
-        use_container_width=True
-    )
+    st.dataframe(respondent_matrix, use_container_width=True)
 
     # Charts Section
     c1, c2 = st.columns([3, 2])
     with c1:
         st.markdown("<div class='section-title'>📊 Matrix Distribution Score by Specific Question Criteria</div>", unsafe_allow_html=True)
         question_chart_data = filtered_df.groupby('Criteria Description')['Score'].mean().reset_index().sort_values(by='Score')
-        
-        fig_bar = px.bar(
-            question_chart_data, 
-            x='Score', 
-            y='Criteria Description', 
-            orientation='h', 
-            color='Score', 
-            color_continuous_scale='Blues', 
-            text_auto='.2f', 
-            template="plotly_dark"
-        )
-        
-        fig_bar.update_layout(
-            plot_bgcolor='rgba(0,0,0,0)', 
-            paper_bgcolor='rgba(0,0,0,0)', 
-            font_family="Inter", 
-            xaxis=dict(
-                title=dict(text="Average Score Value Out of 5.0", font=dict(color='#FFFFFF')), 
-                range=[1, 5], 
-                gridcolor='#1E293B'
-            ), 
-            yaxis=dict(title=None, showticklabels=False), 
-            coloraxis_showscale=False
-        )
+        fig_bar = px.bar(question_chart_data, x='Score', y='Criteria Description', orientation='h', color='Score', color_continuous_scale='Blues', text_auto='.2f', template="plotly_dark")
+        fig_bar.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_family="Inter", xaxis=dict(title=dict(text="Average Score Value Out of 5.0", font=dict(color='#FFFFFF')), range=[1, 5], gridcolor='#1E293B'), yaxis=dict(title=None, showticklabels=False), coloraxis_showscale=False)
         st.plotly_chart(fig_bar, use_container_width=True)
         
     with c2:
@@ -343,7 +316,6 @@ with tab_survey:
     st.markdown("<div class='section-title'>📝 Live Questionnaire Engine</div>", unsafe_allow_html=True)
     st.markdown("<p style='color:#94A3B8;'>Responders can log their ratings here. Select a department to generate its matching verification criteria matrix.</p>", unsafe_allow_html=True)
     
-    # Demographics Choice for logging survey responses
     col_surv_dept, col_surv_tenure = st.columns(2)
     with col_surv_dept:
         survey_dept = st.selectbox("Identify Your Active Department Hub:", list(DEPARTMENT_QUESTIONS.keys()), key="survey_dept_select")
@@ -352,25 +324,18 @@ with tab_survey:
         
     st.markdown("<div class='scale-legend'><span><b>1</b> 🤬 Strongly Disagree</span><span><b>2</b> 🙁 Disagree</span><span><b>3</b> 😐 Neutral</span><span><b>4</b> <b>🙂 Agree</b></span><span><b>5</b> <b>🤩 Strongly Agree</b></span></div>", unsafe_allow_html=True)
     
-    # Survey Intake Submission Core Block Form
     with st.form("interactive_intake_form", clear_on_submit=True):
         survey_responses = {}
         active_questions = DEPARTMENT_QUESTIONS[survey_dept]
         
         for idx, question in enumerate(active_questions):
             st.markdown(f'<div class="question-block"><div class="question-text"><b>Q{idx+1}.</b> {question}</div></div>', unsafe_allow_html=True)
-            score_selection = st.segmented_control(
-                label=f"Rating Choice for Survey Q{idx+1}",
-                options=emoji_options,
-                key=f"survey_q_{idx+1}",
-                label_visibility="collapsed"
-            )
+            score_selection = st.segmented_control(label=f"Rating Choice for Survey Q{idx+1}", options=emoji_options, key=f"survey_q_{idx+1}", label_visibility="collapsed")
             survey_responses[f"Question {idx+1}"] = {"criteria": question, "selected_rating": score_selection}
             st.markdown("<br>", unsafe_allow_html=True)
             
         st.markdown("### 📝 Additional Points or Recommendations")
         additional_notes = st.text_area("Notes entry:", label_visibility="collapsed", placeholder="Type any system anomalies or optimization notes here...", key="survey_notes_area")
-        
         submit_survey_btn = st.form_submit_button("Submit Operational Evaluation Log")
         
     if submit_survey_btn:
@@ -388,9 +353,60 @@ with tab_survey:
             st.success("🎉 **Feedback Recorded Successfully!** The payload is clean and verified against operational schemas.")
             
             json_string = json.dumps(final_payload, indent=2)
-            st.download_button(
-                label="📥 Download Clean Raw Data Block (.json)",
-                data=json_string,
-                file_name=f"PIQA_Raw_{survey_dept.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.json",
-                mime="application/json"
-            )
+            st.download_button(label="📥 Download Clean Raw Data Block (.json)", data=json_string, file_name=f"PIQA_Raw_{survey_dept.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.json", mime="application/json")
+
+# ==========================================
+# VIEW 3: NEW! PRINT & DISTRIBUTION HUB
+# ==========================================
+with tab_print:
+    st.markdown("<div class='section-title'>🖨️ Document Generation & Share Center</div>", unsafe_allow_html=True)
+    
+    c_print_1, c_print_2 = st.columns([1, 2])
+    
+    with c_print_1:
+        st.markdown("### 📄 Print Configuration")
+        enable_print_mode = st.toggle("✨ Activate High-Contrast Print View Mode", value=False, help="Inverts backgrounds to crisp white and clean black ink lines to prevent dark background ink bleeding during print or PDF output exports.")
+        
+        # Inject styling rules if print view mode is checked by administrator
+        if enable_print_mode:
+            st.markdown("""
+                <style>
+                .stApp { background-color: #FFFFFF !important; color: #000000 !important; }
+                [data-testid="stSidebar"] { display: none !important; }
+                .metric-card { background: #FFFFFF !important; border: 2px solid #000000 !important; color: #000000 !important; box-shadow: none !important; }
+                .metric-card h2, .metric-card p { color: #000000 !important; }
+                h1, .section-title, p, span { color: #000000 !important; background: none !important; -webkit-text-fill-color: initial !important; border-bottom-color: #000000 !important;}
+                header, [data-testid="stHeader"] { display: none !important; }
+                </style>
+            """, unsafe_allow_html=True)
+            st.info("💡 **Print Mode Active:** Background structures are modified to clean high contrast white paper profiles. Simply press `Ctrl + P` (or `Cmd + P` on Mac) to use your browser's printer profile or generate a clean local .pdf file!")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("### 📤 Export Raw Consolidated Matrices")
+        
+        # CSV Export Options for sharing across departments
+        csv_buffer = filtered_df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Export Current Slice Dataset to CSV",
+            data=csv_buffer,
+            file_name=f"PIQA_Export_{selected_dept.replace(' ', '_')}.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+        
+    with c_print_2:
+        st.markdown("### 🔗 Share Snapshot Details")
+        st.markdown("Generate a quick snapshot profile text summary block to send to leadership channels or internal team boards.")
+        
+        summary_share_string = f"""--- PIQA FIELD OPERATIONAL SNAPSHOT PROFILE ---
+Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}
+Target Scope Segment: {selected_dept}
+Employee Tenure Profile Mix: {selected_tenure}
+---------------------------------------------
+* Total Validated Respondents Group: {distinct_active_respondents} Staff
+* Active Composite Mean Metric Score: {avg_score} / 5.0
+* Current Operational Quality Index Status: {"⚠️ Threshold Gaps Detected" if avg_score < 3.8 else "✅ Healthy Baseline Standard"}
+---------------------------------------------"""
+        
+        st.text_area("📋 Copy Distribution Summary Block:", value=summary_share_string, height=200)
+        st.caption("Select all text inside the block above to quickly share snapshot findings on internal messaging platforms or notification emails.")
