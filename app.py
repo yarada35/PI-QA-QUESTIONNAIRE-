@@ -192,19 +192,24 @@ def generate_verbatim_survey_dataset():
     emoji_map = {1: "🤬", 2: "🙁", 3: "😐", 4: "🙂", 5: "🤩"}
     tenures = ['< 1 Year', '1-3 Years', '3+ Years']
     
+    # Simulating unique responders per group to accurately calculate respondent sample distribution
     for dept, questions in DEPARTMENT_QUESTIONS.items():
-        for q_idx, question in enumerate(questions):
-            for _ in range(35):
-                score = np.random.choice([1, 2, 3, 4, 5], p=[0.05, 0.07, 0.15, 0.50, 0.23])
-                records.append({
-                    "Department": dept,
-                    "Question Number": f"Q{q_idx + 1}",
-                    "Criteria Description": question,
-                    "Score": score,
-                    "Emoji": emoji_map[score],
-                    "Sentiment": "Positive" if score > 3 else ("Neutral" if score == 3 else "Negative"),
-                    "Tenure": np.random.choice(tenures)
-                })
+        for tenure in tenures:
+            num_respondents = int(np.random.randint(8, 20)) # Unique entities responding
+            for resp_id in range(num_respondents):
+                unique_survey_id = f"RESP_{dept[:3].upper()}_{tenure[:2]}_{resp_id}"
+                for q_idx, question in enumerate(questions):
+                    score = np.random.choice([1, 2, 3, 4, 5], p=[0.05, 0.07, 0.15, 0.50, 0.23])
+                    records.append({
+                        "RespondentID": unique_survey_id,
+                        "Department": dept,
+                        "Question Number": f"Q{q_idx + 1}",
+                        "Criteria Description": question,
+                        "Score": score,
+                        "Emoji": emoji_map[score],
+                        "Sentiment": "Positive" if score > 3 else ("Neutral" if score == 3 else "Negative"),
+                        "Tenure": tenure
+                    })
     return pd.DataFrame(records)
 
 df = generate_verbatim_survey_dataset()
@@ -250,16 +255,19 @@ with tab_dash:
 
     st.markdown(f"<p style='color:#94A3B8;'><b>Active Analytics View:</b> Segment: <span style='color:#38BDF8;'>{selected_dept}</span> | Profile Mix: <span style='color:#34D399;'>{selected_tenure}</span></p>", unsafe_allow_html=True)
     
+    # Dynamically find the count of distinct physical individual responders in active subset slice
+    distinct_active_respondents = filtered_df['RespondentID'].nunique()
+
     # Summary KPI Grid
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         avg_score = round(filtered_df['Score'].mean(), 2) if not filtered_df.empty else 0.0
         st.markdown(f'<div class="metric-card"><p style="color:#94A3B8; font-size: 0.8rem; text-transform: uppercase; font-weight:600; margin-bottom:4px;">Composite Mean Score</p><h2 style="font-family:\'Space Grotesk\'; font-size:2.2rem; color:#F8FAFC; margin:0;">{avg_score} <span style="font-size:1.2rem; color:#38BDF8;">/ 5.0</span></h2></div>', unsafe_allow_html=True)
     with col2:
-        total_responses = len(filtered_df)
-        st.markdown(f'<div class="metric-card" style="border-left-color: #34D399;"><p style="color:#94A3B8; font-size: 0.8rem; text-transform: uppercase; font-weight:600; margin-bottom:4px;">Evaluated Sample Blocks</p><h2 style="font-family:\'Space Grotesk\'; font-size:2.2rem; color:#F8FAFC; margin:0;">{total_responses}</h2></div>', unsafe_allow_html=True)
+        # Highlighting the physical count of responders right in the key indicators row
+        st.markdown(f'<div class="metric-card" style="border-left-color: #34D399;"><p style="color:#34D399; font-size: 0.8rem; text-transform: uppercase; font-weight:600; margin-bottom:4px;">Total Sample Respondents</p><h2 style="font-family:\'Space Grotesk\'; font-size:2.2rem; color:#F8FAFC; margin:0;">{distinct_active_respondents} <span style="font-size:1.1rem; color:#94A3B8;">Staff</span></h2></div>', unsafe_allow_html=True)
     with col3:
-        pos_pct = round((len(filtered_df[filtered_df['Sentiment'] == 'Positive']) / total_responses) * 100) if total_responses > 0 else 0
+        pos_pct = round((len(filtered_df[filtered_df['Sentiment'] == 'Positive']) / len(filtered_df)) * 100) if not filtered_df.empty else 0
         st.markdown(f'<div class="metric-card" style="border-left-color: #34D399;"><p style="color:#94A3B8; font-size: 0.8rem; text-transform: uppercase; font-weight:600; margin-bottom:4px;">Satisfaction Index</p><h2 style="font-family:\'Space Grotesk\'; font-size:2.2rem; color:#F8FAFC; margin:0;">{pos_pct}%</h2></div>', unsafe_allow_html=True)
     with col4:
         mode_score = filtered_df['Score'].mode()[0] if not filtered_df.empty else 3
@@ -267,6 +275,19 @@ with tab_dash:
         st.markdown(f'<div class="metric-card" style="border-left-color: #FBBF24;"><p style="color:#94A3B8; font-size: 0.8rem; text-transform: uppercase; font-weight:600; margin-bottom:4px;">Dominant Sentiment</p><h2 style="font-family:\'Space Grotesk\'; font-size:2.2rem; color:#F8FAFC; margin:0;">Level {mode_score} {emoji_star}</h2></div>', unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
+
+    # --- ADDED: RESPONDENT DEMOGRAPHIC BREAKDOWN TABLE MATRIX ---
+    st.markdown("<div class='section-title'>📋 Total Number of Respondents Matrix (Observation Breakdown)</div>", unsafe_allow_html=True)
+    
+    # Calculate unique respondent profiles grouped across vectors cleanly
+    respondent_matrix = df.groupby(['Department', 'Tenure'])['RespondentID'].nunique().unstack(fill_value=0)
+    respondent_matrix['Total Fleet'] = respondent_matrix.sum(axis=1)
+    
+    # Render interactive streamlined table display widget
+    st.dataframe(
+        respondent_matrix.style.background_gradient(cmap='Blues', subset=['Total Fleet']),
+        use_container_width=True
+    )
 
     # Charts Section
     c1, c2 = st.columns([3, 2])
