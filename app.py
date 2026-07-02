@@ -14,7 +14,7 @@ st.set_page_config(
 # Deep Custom CSS Injection to force uniform dark tones and high-impact text rendering
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Syne:wght@700;800&family=Inter:wght@400;500&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght=400;600;700&family=Syne:wght=700;800&family=Inter:wght=400;500&display=swap');
     
     /* Force main app background wrapper to dark theme */
     .stApp {
@@ -175,7 +175,6 @@ with c1:
     freq_data = filtered_df['Score'].value_counts().sort_index().reset_index()
     freq_data.columns = ['Likert Scale Rating', 'Total Feedback Logs']
     
-    # Custom Bar Chart configured to match dark styling themes
     fig_bar = px.bar(
         freq_data, 
         x='Likert Scale Rating', 
@@ -197,7 +196,8 @@ with c1:
     st.plotly_chart(fig_bar, use_container_width=True)
 
 with c2:
-    st.markdown("<div class='section-title'>🍕 Sentiment Proportions</div>", unsafe_allowed_html=True)
+    # --- TYPO FIXED HERE ---
+    st.markdown("<div class='section-title'>🍕 Sentiment Proportions</div>", unsafe_allow_html=True)
     sentiment_data = filtered_df['Sentiment'].value_counts().reset_index()
     
     fig_pie = px.pie(
