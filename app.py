@@ -14,7 +14,7 @@ st.set_page_config(
 # Custom CSS for artistic fonts, gradient headers, and interactive UI card styling
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Syne:wght@700;800&family=Inter:wght@400;500&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght=400;600;700&family=Syne:wght=700;800&family=Inter:wght=400;500&display=swap');
     
     /* Typography Overrides */
     .main h1 {
@@ -64,7 +64,7 @@ st.markdown("""
         border: 1px solid #E2E8F0;
     }
     </style>
-""", unsafe_allowed_html=True)
+""", unsafe_allow_html=True)
 
 # 2. Mock Data Generation Engine (Matching Survey Specifications)
 @st.cache_data
@@ -90,11 +90,11 @@ df = get_mock_survey_data()
 
 # 3. Sidebar Header & Visual Badge Department Navigation
 with st.sidebar:
-    st.markdown("<h2 style='font-family:\"Syne\"; color:#3B82F6;'>🎨 Control Room</h2>", unsafe_allowed_html=True)
+    st.markdown("<h2 style='font-family:\"Syne\"; color:#3B82F6;'>🎨 Control Room</h2>", unsafe_allow_html=True)
     st.markdown("---")
     
     st.markdown("**Select Department Target Loop:**")
-    # Instead of an old drop-down, using clear pill-selectors for instant visual switching
+    # Using dynamic radio layout for visual selection
     selected_dept = st.radio(
         label="Target Departments",
         options=['All Departments'] + list(df['Department'].unique()),
@@ -117,7 +117,7 @@ if selected_tenure != 'All Mix':
     filtered_df = filtered_df[filtered_df['Tenure'] == selected_tenure]
 
 # 4. Main Canvas - Dynamic Visual Analytics Dashboard
-st.markdown("<h1>PIQA Synergy Matrix Dashboard</h1>", unsafe_allowed_html=True)
+st.markdown("<h1>PIQA Synergy Matrix Dashboard</h1>", unsafe_allow_html=True)
 st.markdown(f"**Live Feed View:** `{selected_dept}` | Tenure Status: `{selected_tenure}`")
 st.markdown("---")
 
@@ -125,13 +125,13 @@ st.markdown("---")
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    avg_score = round(filtered_df['Score'].mean(), 2)
+    avg_score = round(filtered_df['Score'].mean(), 2) if not filtered_df.empty else 0.0
     st.markdown(f"""
         <div class="metric-card" style="border-left-color: #3B82F6;">
             <p style="color:#64748B; font-size: 0.8rem; text-transform: uppercase; font-weight:600;">Composite Mean Score</p>
             <h2 style="font-family:'Space Grotesk'; font-size:2.2rem; color:#1E293B; margin:0;">{avg_score} <span style="font-size:1.2rem; color:#3B82F6;">/ 5.0</span></h2>
         </div>
-    """, unsafe_allowed_html=True)
+    """, unsafe_allow_html=True)
 
 with col2:
     total_responses = len(filtered_df)
@@ -140,16 +140,16 @@ with col2:
             <p style="color:#64748B; font-size: 0.8rem; text-transform: uppercase; font-weight:600;">Sample Size (N)</p>
             <h2 style="font-family:'Space Grotesk'; font-size:2.2rem; color:#1E293B; margin:0;">{total_responses}</h2>
         </div>
-    """, unsafe_allowed_html=True)
+    """, unsafe_allow_html=True)
 
 with col3:
-    pos_pct = round((len(filtered_df[filtered_df['Sentiment'] == 'Positive']) / total_responses) * 180) if total_responses > 0 else 0
+    pos_pct = round((len(filtered_df[filtered_df['Sentiment'] == 'Positive']) / total_responses) * 100) if total_responses > 0 else 0
     st.markdown(f"""
         <div class="metric-card" style="border-left-color: #10B981;">
             <p style="color:#64748B; font-size: 0.8rem; text-transform: uppercase; font-weight:600;">Satisfaction index</p>
             <h2 style="font-family:'Space Grotesk'; font-size:2.2rem; color:#1E293B; margin:0;">{pos_pct}%</h2>
         </div>
-    """, unsafe_allowed_html=True)
+    """, unsafe_allow_html=True)
 
 with col4:
     mode_score = filtered_df['Score'].mode()[0] if not filtered_df.empty else 3
@@ -159,15 +159,15 @@ with col4:
             <p style="color:#64748B; font-size: 0.8rem; text-transform: uppercase; font-weight:600;">Dominant Sentiment</p>
             <h2 style="font-family:'Space Grotesk'; font-size:2.2rem; color:#1E293B; margin:0;">Level {mode_score} {emoji_star}</h2>
         </div>
-    """, unsafe_allowed_html=True)
+    """, unsafe_allow_html=True)
 
-st.markdown("<br>", unsafe_allowed_html=True)
+st.markdown("<br>", unsafe_allow_html=True)
 
 # 5. Visualizing Frequencies via Interactive Graphs
 c1, c2 = st.columns([3, 2])
 
 with c1:
-    st.markdown("<div class='section-title'>📊 Response Frequency Distribution Matrix</div>", unsafe_allowed_html=True)
+    st.markdown("<div class='section-title'>📊 Response Frequency Distribution Matrix</div>", unsafe_allow_html=True)
     freq_data = filtered_df['Score'].value_counts().sort_index().reset_index()
     freq_data.columns = ['Likert Scale Rating', 'Total Feedback Logs']
     
@@ -190,7 +190,7 @@ with c1:
     st.plotly_chart(fig_bar, use_container_width=True)
 
 with c2:
-    st.markdown("<div class='section-title'>🍕 Sentiment Proportions</div>", unsafe_allowed_html=True)
+    st.markdown("<div class='section-title'>🍕 Sentiment Proportions</div>", unsafe_allow_html=True)
     sentiment_data = filtered_df['Sentiment'].value_counts().reset_index()
     
     fig_pie = px.pie(
@@ -209,7 +209,7 @@ with c2:
     st.plotly_chart(fig_pie, use_container_width=True)
 
 # 6. Qualitative Insights & Subgroup Cross-Tabulations
-st.markdown("<div class='section-title'>⚡ Subgroup Cross-Tabulation Analysis</div>", unsafe_allowed_html=True)
+st.markdown("<div class='section-title'>⚡ Subgroup Cross-Tabulation Analysis</div>", unsafe_allow_html=True)
 xtab = pd.crosstab(df['Department'], df['Score'], normalize='index') * 100
 xtab = xtab.round(1)
 
@@ -225,8 +225,8 @@ fig_heat.update_layout(font_family="Inter")
 st.plotly_chart(fig_heat, use_container_width=True)
 
 # 7. Actionable Recommendation Module
-st.markdown("<div class='section-title'>🎯 Priority Action Register Matrix</div>", unsafe_allowed_html=True)
+st.markdown("<div class='section-title'>🎯 Priority Action Register Matrix</div>", unsafe_allow_html=True)
 if avg_score < 3.8:
-    st.error("🚨 **High Alert Action Required:** Current metrics reflect a dip below standard target quality values ($<3.8$). Schedule immediate Cross-Functional Team (CFT) meetings to clear process friction bottlenecks.")
+    st.error("🚨 **High Alert Action Required:** Current metrics reflect a dip below standard target quality values (< 3.8). Schedule immediate Cross-Functional Team (CFT) meetings to clear process friction bottlenecks.")
 else:
     st.success("✨ **Healthy Operational Standard Maintained:** Internal customer loops align with organizational operational health metrics. Continue monthly data cleaning runs to capture emerging workplace variations.")
