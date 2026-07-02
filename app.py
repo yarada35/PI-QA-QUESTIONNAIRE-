@@ -135,51 +135,51 @@ st.markdown("""
 # 2. Hardcoded Survey Matrix Verbatim Mapping
 DEPARTMENT_QUESTIONS = {
     "Plant Engineering Department": [
-        "Provide technical data and specification as per the request[cite: 2]",
-        "Cooperation in mould cleaning check up to shorten its change time[cite: 2]",
-        "Communication is on time to deliver the request service[cite: 2]",
-        "Provide support based on request[cite: 2]",
-        "Test result is given for plant engineering on time[cite: 2]",
-        "Active participation in cross functional team to address common plant problems[cite: 2]",
-        "Satisfaction on overall relationship with the department[cite: 2]"
+        "Provide technical data and specification as per the request",
+        "Cooperation in mould cleaning check up to shorten its change time",
+        "Communication is on time to deliver the request service",
+        "Provide support based on request",
+        "Test result is given for plant engineering on time",
+        "Active participation in cross functional team to address common plant problems",
+        "Satisfaction on overall relationship with the department"
     ],
     "Production Department": [
-        "Recipes/Specifications/ Work instructions are updated periodically and understandable for users[cite: 3]",
-        "Helpful work instructions are prepared by considering quality with productivity[cite: 3]",
-        "Root cause analysis & prevention work in collaboration with CFT team[cite: 3]",
-        "There is cooperation with production team to reduce waste[cite: 3]",
-        "Work instructions are prepared based on good practices of the company[cite: 3]",
-        "Recommendations are given for nonconforming Semi finished products on time[cite: 3]",
-        "Materials are released for production as per laboratory testing time and material rest time[cite: 3]",
-        "Gaps seen in the process are highlighted for correction to be taken[cite: 3]",
-        "Providing gap base training as per request for production staffs.[cite: 3]"
+        "Recipes/Specifications/ Work instructions are updated periodically and understandable for users",
+        "Helpful work instructions are prepared by considering quality with productivity",
+        "Root cause analysis & prevention work in collaboration with CFT team",
+        "There is cooperation with production team to reduce waste",
+        "Work instructions are prepared based on good practices of the company",
+        "Recommendations are given for nonconforming Semi finished products on time",
+        "Materials are released for production as per laboratory testing time and material rest time",
+        "Gaps seen in the process are highlighted for correction to be taken",
+        "Providing gap base training as per request for production staffs."
     ],
     "Sales and Marketing Department": [
-        "Provide technical data and specification as per the request[cite: 5]",
-        "Response for product quality improvement as per request[cite: 5]",
-        "Communication is on time about new products[cite: 5]",
-        "Provide technical support based on request[cite: 5]",
-        "Claim tire inspection and on time feedback.[cite: 5]",
-        "Actively participating on field and customer support activities[cite: 5]",
-        "Satisfaction on overall relationship with the department[cite: 5]"
+        "Provide technical data and specification as per the request",
+        "Response for product quality improvement as per request",
+        "Communication is on time about new products",
+        "Provide technical support based on request",
+        "Claim tire inspection and on time feedback.",
+        "Actively participating on field and customer support activities",
+        "Satisfaction on overall relationship with the department"
     ],
     "PIQA Employee Staff": [
-        "I have immediate access to calibrated testing equipment required for my shift operations.[cite: 1]",
-        "The internal workspace, ventilation, and physical safety barriers support optimized execution.[cite: 1]",
-        "Shift assignment transitions and inter-departmental communications are clear and structured.[cite: 1]",
-        "Management consistently supports upskilling regarding changes in compound mixtures or compound recipes.[cite: 1]"
+        "I have immediate access to calibrated testing equipment required for my shift operations.",
+        "The internal workspace, ventilation, and physical safety barriers support optimized execution.",
+        "Shift assignment transitions and inter-departmental communications are clear and structured.",
+        "Management consistently supports upskilling regarding changes in compound mixtures or compound recipes."
     ],
     "Purchase Department": [
-        "PIQA delivers technical data and raw material inspection specifications quickly.[cite: 4]",
-        "The chemical and mechanical laboratory feedback loops for vendor samples align with purchasing timelines.[cite: 4]",
-        "Supplier Non-Conformance Reports (NCR) are detailed objectively to support raw material claims.[cite: 4]",
-        "Overall collaborative alignment on alternative material sourcing during supply line updates is positive.[cite: 4]"
+        "PIQA delivers technical data and raw material inspection specifications quickly.",
+        "The chemical and mechanical laboratory feedback loops for vendor samples align with purchasing timelines.",
+        "Supplier Non-Conformance Reports (NCR) are detailed objectively to support raw material claims.",
+        "Overall collaborative alignment on alternative material sourcing during supply line updates is positive."
     ],
     "Store Department": [
-        "The testing processing times for incoming raw materials prevent compound inventory stagnations.[cite: 6]",
-        "Clear tags, visual indicators, and status updates are provided for quarantined/non-conforming stock.[cite: 6]",
-        "PIQA personnel follow warehouse zoning restrictions and material rest timelines accurately.[cite: 6]",
-        "Clear technical directions are provided for handling aging inventories or compound batch releases.[cite: 6]"
+        "The testing processing times for incoming raw materials prevent compound inventory stagnations.",
+        "Clear tags, visual indicators, and status updates are provided for quarantined/non-conforming stock.",
+        "PIQA personnel follow warehouse zoning restrictions and material rest timelines accurately.",
+        "Clear technical directions are provided for handling aging inventories or compound batch releases."
     ]
 }
 
@@ -192,10 +192,9 @@ def generate_verbatim_survey_dataset():
     emoji_map = {1: "🤬", 2: "🙁", 3: "😐", 4: "🙂", 5: "🤩"}
     tenures = ['< 1 Year', '1-3 Years', '3+ Years']
     
-    # Simulating unique responders per group to accurately calculate respondent sample distribution
     for dept, questions in DEPARTMENT_QUESTIONS.items():
         for tenure in tenures:
-            num_respondents = int(np.random.randint(8, 20)) # Unique entities responding
+            num_respondents = int(np.random.randint(8, 20)) 
             for resp_id in range(num_respondents):
                 unique_survey_id = f"RESP_{dept[:3].upper()}_{tenure[:2]}_{resp_id}"
                 for q_idx, question in enumerate(questions):
@@ -255,7 +254,6 @@ with tab_dash:
 
     st.markdown(f"<p style='color:#94A3B8;'><b>Active Analytics View:</b> Segment: <span style='color:#38BDF8;'>{selected_dept}</span> | Profile Mix: <span style='color:#34D399;'>{selected_tenure}</span></p>", unsafe_allow_html=True)
     
-    # Dynamically find the count of distinct physical individual responders in active subset slice
     distinct_active_respondents = filtered_df['RespondentID'].nunique()
 
     # Summary KPI Grid
@@ -264,7 +262,6 @@ with tab_dash:
         avg_score = round(filtered_df['Score'].mean(), 2) if not filtered_df.empty else 0.0
         st.markdown(f'<div class="metric-card"><p style="color:#94A3B8; font-size: 0.8rem; text-transform: uppercase; font-weight:600; margin-bottom:4px;">Composite Mean Score</p><h2 style="font-family:\'Space Grotesk\'; font-size:2.2rem; color:#F8FAFC; margin:0;">{avg_score} <span style="font-size:1.2rem; color:#38BDF8;">/ 5.0</span></h2></div>', unsafe_allow_html=True)
     with col2:
-        # Highlighting the physical count of responders right in the key indicators row
         st.markdown(f'<div class="metric-card" style="border-left-color: #34D399;"><p style="color:#34D399; font-size: 0.8rem; text-transform: uppercase; font-weight:600; margin-bottom:4px;">Total Sample Respondents</p><h2 style="font-family:\'Space Grotesk\'; font-size:2.2rem; color:#F8FAFC; margin:0;">{distinct_active_respondents} <span style="font-size:1.1rem; color:#94A3B8;">Staff</span></h2></div>', unsafe_allow_html=True)
     with col3:
         pos_pct = round((len(filtered_df[filtered_df['Sentiment'] == 'Positive']) / len(filtered_df)) * 100) if not filtered_df.empty else 0
@@ -276,16 +273,14 @@ with tab_dash:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # --- ADDED: RESPONDENT DEMOGRAPHIC BREAKDOWN TABLE MATRIX ---
+    # --- REMOVED THE COLOURED STYLER GRADIENT FROM THE CODE BELOW TO ELIMINATE IMPORT ERROR ---
     st.markdown("<div class='section-title'>📋 Total Number of Respondents Matrix (Observation Breakdown)</div>", unsafe_allow_html=True)
     
-    # Calculate unique respondent profiles grouped across vectors cleanly
     respondent_matrix = df.groupby(['Department', 'Tenure'])['RespondentID'].nunique().unstack(fill_value=0)
     respondent_matrix['Total Fleet'] = respondent_matrix.sum(axis=1)
     
-    # Render interactive streamlined table display widget
     st.dataframe(
-        respondent_matrix.style.background_gradient(cmap='Blues', subset=['Total Fleet']),
+        respondent_matrix,
         use_container_width=True
     )
 
