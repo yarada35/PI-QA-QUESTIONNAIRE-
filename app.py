@@ -5,7 +5,6 @@ import plotly.express as px
 import json
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
-from cryptography.hazmat.primitives import serialization
 
 # 1. Page Configuration
 st.set_page_config(
@@ -148,33 +147,22 @@ emoji_options = ["1 🤬", "2 🙁", "3 😐", "4 🙂", "5 🤩"]
 emoji_clean_map = {"1": "🤬", "2": "🙁", "3": "😐", "4": "🙂", "5": "🤩"}
 
 # ==========================================
-# 3. Cryptographic Runtime Interceptor Patch
+# 3. Safe Secrets Format Normalization Patch
 # ==========================================
-# Use a structural attribute flag to guarantee we patch only once across app refreshes
-if not hasattr(serialization, "_is_patched_by_app"):
-    orig_load_pem_private_key = serialization.load_pem_private_key
-
-    def custom_load_pem_private_key(data, password=None, backend=None):
-        if isinstance(data, bytes):
-            try:
-                data_str = data.decode("utf-8", errors="ignore")
-                # Convert text-escaped newlines to actual structural breaks
-                data_str = data_str.replace("\\n", "\n").replace("\\\n", "\n").strip()
-                
-                # Reconstruct missing layout padding blocks if the string was flattened
-                if "-----BEGIN PRIVATE KEY-----" in data_str and "\n" not in data_str.replace("-----BEGIN PRIVATE KEY-----", "").strip():
-                    body = data_str.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "").strip()
-                    data_str = f"-----BEGIN PRIVATE KEY-----\n{body}\n-----END PRIVATE KEY-----\n"
-                    
-                data = data_str.encode("utf-8")
-            except Exception:
-                pass
-                
-        return orig_load_pem_private_key(data, password, backend)
-
-    # Apply the interception hook and flag it done
-    serialization.load_pem_private_key = custom_load_pem_private_key
-    serialization._is_patched_by_app = True
+if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
+    if "private_key" in st.secrets["connections"]["gsheets"]:
+        raw_key = st.secrets["connections"]["gsheets"]["private_key"]
+        
+        # Convert literal string escape sequences into true structural breaks
+        cleaned_key = raw_key.replace("\\n", "\n").replace("\\\n", "\n").strip()
+        
+        # Reconstruct missing line padding blocks if the secret input was flattened completely
+        if "-----BEGIN PRIVATE KEY-----" in cleaned_key and "\n" not in cleaned_key.replace("-----BEGIN PRIVATE KEY-----", "").strip():
+            body = cleaned_key.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "").strip()
+            cleaned_key = f"-----BEGIN PRIVATE KEY-----\n{body}\n-----END PRIVATE KEY-----\n"
+            
+        # Write clean layout back to the hidden underlying configuration dictionary
+        st.secrets._secrets["connections"]["gsheets"]["private_key"] = cleaned_key
 
 # Initialize Google Sheets Connection Wrapper
 conn = st.connection("gsheets", type=GSheetsConnection)
