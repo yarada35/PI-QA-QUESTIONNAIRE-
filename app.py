@@ -146,13 +146,15 @@ DEPARTMENT_QUESTIONS = {
 emoji_options = ["1 🤬", "2 🙁", "3 😐", "4 🙂", "5 🤩"]
 emoji_clean_map = {"1": "🤬", "2": "🙁", "3": "😐", "4": "🙂", "5": "🤩"}
 
+# ==========================================
 # 3. Cryptographic Backslash-n Repair Patch
-# Forces dynamic transformation of literal text keys before GSheets Connection reads it.
+# ==========================================
+# Safely modifies the underlying raw dictionary directly to bypass read-only restriction
 if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
     if "private_key" in st.secrets["connections"]["gsheets"]:
         raw_key = st.secrets["connections"]["gsheets"]["private_key"]
         cleaned_key = raw_key.replace("\\n", "\n").strip()
-        st.secrets["connections"]["gsheets"]["private_key"] = cleaned_key
+        st.secrets._secrets["connections"]["gsheets"]["private_key"] = cleaned_key
 
 # Initialize Google Sheets Connection Wrapper
 conn = st.connection("gsheets", type=GSheetsConnection)
@@ -304,7 +306,7 @@ with tab_survey:
             updated_master_df = pd.concat([df, new_df], ignore_index=True)
             
             try:
-                # Fixed worksheet definition call parameters
+                # Updated worksheet connection call parameters
                 conn.update(
                     spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet"], 
                     worksheet="Sheet1",
@@ -319,11 +321,11 @@ with tab_survey:
 # VIEW 3: PRINT & DISTRIBUTION HUB
 # ==========================================
 with tab_print:
-    st.markdown("<div class='section-title'>🖨 nighttime Document Generation Center</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-title'>🖨️ Document Generation Center</div>", unsafe_allow_html=True)
     
     c_print_1, c_print_2 = st.columns([1, 2])
     with c_print_1:
-        st.markdown("### 📄 Print Configuration Configuration")
+        st.markdown("### 📄 Print Configuration")
         enable_print_mode = st.toggle("✨ Activate High-Contrast Print View Mode", value=False)
         
         if enable_print_mode:
