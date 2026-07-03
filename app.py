@@ -150,30 +150,33 @@ emoji_clean_map = {"1": "🤬", "2": "🙁", "3": "😐", "4": "🙂", "5": "�
 # ==========================================
 # 3. Cryptographic Runtime Interceptor Patch
 # ==========================================
-orig_load_pem_private_key = serialization.load_pem_private_key
+# Use a structural attribute flag to guarantee we patch only once across app refreshes
+if not hasattr(serialization, "_is_patched_by_app"):
+    orig_load_pem_private_key = serialization.load_pem_private_key
 
-def custom_load_pem_private_key(data, password=None, backend=None):
-    if isinstance(data, bytes):
-        try:
-            data_str = data.decode("utf-8", errors="ignore")
-            # Convert text-escaped newlines to actual structural breaks
-            data_str = data_str.replace("\\n", "\n").replace("\\\n", "\n").strip()
-            
-            # Reconstruct missing layout padding blocks if the string was flattened
-            if "-----BEGIN PRIVATE KEY-----" in data_str and "\n" not in data_str.replace("-----BEGIN PRIVATE KEY-----", "").strip():
-                body = data_str.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "").strip()
-                data_str = f"-----BEGIN PRIVATE KEY-----\n{body}\n-----END PRIVATE KEY-----\n"
+    def custom_load_pem_private_key(data, password=None, backend=None):
+        if isinstance(data, bytes):
+            try:
+                data_str = data.decode("utf-8", errors="ignore")
+                # Convert text-escaped newlines to actual structural breaks
+                data_str = data_str.replace("\\n", "\n").replace("\\\n", "\n").strip()
                 
-            data = data_str.encode("utf-8")
-        except Exception:
-            pass
-            
-    return orig_load_pem_private_key(data, password, backend)
+                # Reconstruct missing layout padding blocks if the string was flattened
+                if "-----BEGIN PRIVATE KEY-----" in data_str and "\n" not in data_str.replace("-----BEGIN PRIVATE KEY-----", "").strip():
+                    body = data_str.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "").strip()
+                    data_str = f"-----BEGIN PRIVATE KEY-----\n{body}\n-----END PRIVATE KEY-----\n"
+                    
+                data = data_str.encode("utf-8")
+            except Exception:
+                pass
+                
+        return orig_load_pem_private_key(data, password, backend)
 
-# Hook the patch directly into the cryptography library before init
-serialization.load_pem_private_key = custom_load_pem_private_key
+    # Apply the interception hook and flag it done
+    serialization.load_pem_private_key = custom_load_pem_private_key
+    serialization._is_patched_by_app = True
 
-# Initialize Google Sheets Connection Wrapper (Safely guarded by the interceptor)
+# Initialize Google Sheets Connection Wrapper
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # Read dynamic layout database directly from Sheet1
