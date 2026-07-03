@@ -146,22 +146,28 @@ emoji_options = ["1 🤬", "2 🙁", "3 😐", "4 🙂", "5 🤩"]
 emoji_clean_map = {"1": "🤬", "2": "🙁", "3": "😐", "4": "🙂", "5": "🤩"}
 
 # ==========================================
-# 3. Clean Internal Secrets Sanitization
+# 3. Dynamic Service Account Key Sanitization
 # ==========================================
 if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
     if "private_key" in st.secrets["connections"]["gsheets"]:
         raw_key = st.secrets["connections"]["gsheets"]["private_key"]
         
-        # Clean literal slash-n string variations safely
-        cleaned_key = raw_key.replace("\\n", "\n").replace("\\\n", "\n").strip()
+        # 1. Strip out literal strings, double quotes, and clean outer whitespaces
+        clean_key = raw_key.replace("\\n", "\n").replace('\\"', '').replace('"', '').strip()
         
-        if "-----BEGIN PRIVATE KEY-----" in cleaned_key and "\n" not in cleaned_key.replace("-----BEGIN PRIVATE KEY-----", "").strip():
-            body = cleaned_key.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "").strip()
-            cleaned_key = f"-----BEGIN PRIVATE KEY-----\n{body}\n-----END PRIVATE KEY-----\n"
-            
-        st.secrets._secrets["connections"]["gsheets"]["private_key"] = cleaned_key
+        # 2. Isolate the base64 crypto block body
+        header = "-----BEGIN PRIVATE KEY-----"
+        footer = "-----END PRIVATE KEY-----"
+        body = clean_key.replace(header, "").replace(footer, "").replace("\n", "").replace(" ", "").strip()
+        
+        # 3. Rebuild lines into exactly 64 characters to satisfy crypto loader standards
+        chunks = [body[i:i+64] for i in range(0, len(body), 64)]
+        formatted_private_key = f"{header}\n" + "\n".join(chunks) + f"\n{footer}\n"
+        
+        # 4. Inject perfectly structured block string back to Streamlit state
+        st.secrets._secrets["connections"]["gsheets"]["private_key"] = formatted_private_key
 
-# Call standard connection loader cleanly
+# Load connection cleanly
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # Read database directly from target workspace Sheet1
