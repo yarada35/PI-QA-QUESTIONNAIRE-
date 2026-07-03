@@ -14,44 +14,107 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS Injection for Black/Dark Premium UI
+# Custom CSS Injection for Premium Black/Dark UI
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght=400;600;700&family=Syne:wght=700;800&family=Inter:wght=400;500;600;700&display=swap');
-    .stApp { background-color: #05070F !important; color: #F1F5F9 !important; }
-    [data-testid="stSidebar"] { background-color: #090D16 !important; border-right: 1px solid #1E293B !important; }
+    
+    .stApp {
+        background-color: #05070F !important;
+        color: #F1F5F9 !important;
+    }
+    
+    [data-testid="stSidebar"] {
+        background-color: #090D16 !important;
+        border-right: 1px solid #1E293B !important;
+    }
+    
     [data-testid="stSidebar"] .stRadio [data-testid="stWidgetLabel"] + div label p {
-        font-family: 'Space Grotesk', sans-serif !important; color: #FBBF24 !important;
-        font-weight: 700 !important; font-size: 1.1rem !important;
+        font-family: 'Space Grotesk', sans-serif !important;
+        color: #FBBF24 !important;
+        font-weight: 700 !important;
+        font-size: 1.1rem !important;
         text-shadow: 0px 0px 8px rgba(251, 191, 36, 0.6) !important;
     }
+    
     .main h1 {
-        font-family: 'Syne', sans-serif; font-weight: 800;
+        font-family: 'Syne', sans-serif;
+        font-weight: 800;
         background: linear-gradient(135deg, #38BDF8 0%, #34D399 50%, #FBBF24 100%);
-        -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 3rem !important;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-size: 3rem !important;
+        letter-spacing: -0.05em;
+        margin-bottom: 0.5rem;
     }
+    
     .section-title {
-        font-family: 'Syne', sans-serif; color: #F8FAFC; font-size: 1.5rem; font-weight: 700;
-        border-bottom: 2px solid #38BDF8; padding-bottom: 0.4rem; margin-top: 1.5rem; margin-bottom: 1.5rem;
+        font-family: 'Syne', sans-serif;
+        color: #F8FAFC;
+        font-size: 1.5rem;
+        font-weight: 700;
+        border-bottom: 2px solid #38BDF8;
+        padding-bottom: 0.4rem;
+        margin-top: 1.5rem;
+        margin-bottom: 1.5rem;
     }
-    .metric-card {
-        background: #111827; border-radius: 16px; padding: 24px; border: 1px solid #1E293B;
-        border-left: 6px solid #38BDF8; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+
+    body, p, label {
+        font-family: 'Inter', sans-serif;
     }
-    .question-block { background: #111827; border: 1px solid #1E293B; border-radius: 12px; padding: 20px; }
-    .question-text { font-family: 'Inter', sans-serif; font-size: 1.05rem; color: #F8FAFC; }
-    .scale-legend {
-        background-color: #090D16; border: 1px solid #1E293B; border-radius: 8px;
-        padding: 12px; margin-bottom: 2rem; display: flex; justify-content: space-around; font-size: 0.85rem;
-    }
+    
     .stTabs [data-baseweb="tab-list"] button {
-        font-size: 1.6rem !important; font-weight: 800 !important; font-family: 'Syne', sans-serif !important;
+        font-size: 1.6rem !important;
+        font-weight: 800 !important;
+        color: #94A3B8 !important;
+        padding: 12px 24px !important;
+        font-family: 'Syne', sans-serif !important;
     }
-    .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] { color: #34D399 !important; }
+    
+    .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
+        color: #34D399 !important;
+        border-bottom: 4px solid #34D399 !important;
+        text-shadow: 0px 0px 12px rgba(52, 211, 153, 0.6);
+    }
+    
+    .metric-card {
+        background: #111827;
+        border-radius: 16px;
+        padding: 24px;
+        border: 1px solid #1E293B;
+        border-left: 6px solid #38BDF8;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .question-block {
+        background: #111827;
+        border: 1px solid #1E293B;
+        border-radius: 12px;
+        padding: 20px;
+    }
+
+    .question-text {
+        font-family: 'Inter', sans-serif;
+        font-size: 1.05rem;
+        font-weight: 500;
+        color: #F8FAFC;
+    }
+
+    .scale-legend {
+        background-color: #090D16;
+        border: 1px solid #1E293B;
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 2rem;
+        display: flex;
+        justify-content: space-around;
+        font-size: 0.85rem;
+        color: #CBD5E1;
+    }
     </style>
 """, unsafe_allow_html=True)
 
-# 2. Hardcoded Question Matrix
+# 2. Hardcoded Survey Matrix Verbatim Mapping
 DEPARTMENT_QUESTIONS = {
     "Plant Engineering Department": [
         "Provide technical data and specification as per the request",
@@ -105,12 +168,20 @@ DEPARTMENT_QUESTIONS = {
 emoji_options = ["1 🤬", "2 🙁", "3 😐", "4 🙂", "5 🤩"]
 emoji_clean_map = {"1": "🤬", "2": "🙁", "3": "😐", "4": "🙂", "5": "🤩"}
 
-# Connect to Google Sheets
-conn = st.connection("gsheets", type=GSheetsConnection)
+# 3. Securely Initialize Connection Passing Secrets Explicitly
+conn = st.connection(
+    "gsheets",
+    type=GSheetsConnection,
+    spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet"],
+    project_id=st.secrets["connections"]["gsheets"]["project_id"],
+    private_key_id=st.secrets["connections"]["gsheets"]["private_key_id"],
+    private_key=st.secrets["connections"]["gsheets"]["private_key"],
+    client_email=st.secrets["connections"]["gsheets"]["client_email"]
+)
 
-# Read dynamic survey data, bypass cache on explicit modifications
+# Read live dataset dynamically (Bypass cache)
 try:
-    df = conn.read(ttl="0d") # 0d dynamic TTL means it queries the sheet cleanly
+    df = conn.read(ttl="0d")
     df['Score'] = pd.to_numeric(df['Score'], errors='coerce')
 except Exception as e:
     df = pd.DataFrame(columns=["RespondentID", "Department", "Question Number", "Criteria Description", "Score", "Emoji", "Sentiment", "Tenure"])
@@ -125,7 +196,7 @@ def clear_global_filters():
 st.markdown("<h1>PIQA Live Matrix Portal</h1>", unsafe_allow_html=True)
 st.markdown("<p style='color:#94A3B8; font-size:1.1rem; margin-bottom: 1.5rem;'>Unified suite for live operational analysis and internal raw feedback collection loops.</p>", unsafe_allow_html=True)
 
-# Sidebar Filter Navigation
+# 4. Sidebar Controls
 with st.sidebar:
     st.markdown("<h2 style='font-family:\"Syne\"; color:#38BDF8; margin-top:0;'>🎨 Control Room</h2>", unsafe_allow_html=True)
     st.markdown("<hr style='border-color: #1E293B;'/>", unsafe_allow_html=True)
@@ -139,7 +210,7 @@ with st.sidebar:
     st.markdown("<hr style='border-color: #1E293B;'/>", unsafe_allow_html=True)
     selected_tenure = st.segmented_control(
         label="Employee Tenure Filter",
-        options=['All Mix'] + ['< 1 Year', '1-3 Years', '3+ Years'],
+        options=['All Mix', '< 1 Year', '1-3 Years', '3+ Years'],
         default='All Mix',
         key="dash_tenure_seg"
     )
@@ -147,7 +218,7 @@ with st.sidebar:
     st.markdown("<hr style='border-color: #1E293B;'/>", unsafe_allow_html=True)
     st.button("🔄 Clear App Filters", on_click=clear_global_filters, use_container_width=True)
 
-# Filter Data Engine
+# Process Filter Slices
 filtered_df = df.dropna(subset=['Score']).copy() if not df.empty else df.copy()
 if selected_dept != 'All Matrix Mix':
     filtered_df = filtered_df[filtered_df['Department'] == selected_dept]
@@ -188,6 +259,7 @@ with tab_dash:
             st.markdown("<div class='section-title'>📊 Average Ratings by Query Breakdown</div>", unsafe_allow_html=True)
             question_chart_data = filtered_df.groupby('Criteria Description')['Score'].mean().reset_index().sort_values(by='Score')
             fig_bar = px.bar(question_chart_data, x='Score', y='Criteria Description', orientation='h', color='Score', color_continuous_scale='Blues', range_x=[1,5], template="plotly_dark")
+            fig_bar.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_family="Inter", yaxis=dict(showticklabels=False))
             st.plotly_chart(fig_bar, use_container_width=True)
         with c2:
             st.markdown("<div class='section-title'>🍕 Proportion Summary</div>", unsafe_allow_html=True)
@@ -230,7 +302,7 @@ with tab_survey:
             resp_id = f"RSP_{datetime.now().strftime('%m%d_%H%M%S')}"
             
             for idx, val in survey_responses.items():
-                raw_score_str = val["selected"][0] # Extract score number
+                raw_score_str = val["selected"][0] 
                 score_int = int(raw_score_str)
                 sentiment = "Positive" if score_int > 3 else ("Neutral" if score_int == 3 else "Negative")
                 
