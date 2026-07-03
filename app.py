@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-import json
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
 
@@ -149,26 +148,23 @@ emoji_clean_map = {"1": "🤬", "2": "🙁", "3": "😐", "4": "🙂", "5": "�
 # ==========================================
 # 3. Clean Internal Secrets Sanitization
 # ==========================================
-# Instead of passing as kwargs, update Streamlit's target secrets backend safely
 if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
     if "private_key" in st.secrets["connections"]["gsheets"]:
         raw_key = st.secrets["connections"]["gsheets"]["private_key"]
         
-        # Clean literal slash-n strings into true carriage returns
+        # Clean literal slash-n string variations safely
         cleaned_key = raw_key.replace("\\n", "\n").replace("\\\n", "\n").strip()
         
-        # Build back structural multiline spacing blocks if completely flattened
         if "-----BEGIN PRIVATE KEY-----" in cleaned_key and "\n" not in cleaned_key.replace("-----BEGIN PRIVATE KEY-----", "").strip():
             body = cleaned_key.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "").strip()
             cleaned_key = f"-----BEGIN PRIVATE KEY-----\n{body}\n-----END PRIVATE KEY-----\n"
             
-        # Update Streamlit's active background memory object directly
         st.secrets._secrets["connections"]["gsheets"]["private_key"] = cleaned_key
 
-# Now call the natural connector without kwargs to avoid the type constraint check
+# Call standard connection loader cleanly
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Read dynamic layout database directly from Sheet1
+# Read database directly from target workspace Sheet1
 try:
     df = conn.read(worksheet="Sheet1", ttl="0d")
     df['Score'] = pd.to_numeric(df['Score'], errors='coerce')
