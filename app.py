@@ -168,8 +168,13 @@ DEPARTMENT_QUESTIONS = {
 emoji_options = ["1 🤬", "2 🙁", "3 😐", "4 🙂", "5 🤩"]
 emoji_clean_map = {"1": "🤬", "2": "🙁", "3": "😐", "4": "🙂", "5": "🤩"}
 
-# 3. Securely Initialize Connection natively from Streamlit Secrets
-conn = st.connection("gsheets", type=GSheetsConnection)
+# 3. Securely Fetch and Automatically Repair Private Key Encoding
+secrets_dict = dict(st.secrets["connections"]["gsheets"])
+if "private_key" in secrets_dict:
+    secrets_dict["private_key"] = secrets_dict["private_key"].replace("\\n", "\n")
+
+# Initialize connection by parsing the safely cleaned secrets explicitly
+conn = st.connection("gsheets", type=GSheetsConnection, **secrets_dict)
 
 # Read live dataset dynamically (Bypass cache)
 try:
@@ -309,10 +314,10 @@ with tab_survey:
                     "Tenure": survey_tenure
                 })
             
-            # Append rows back to the primary Google Sheet live
+            # Save data back to spreadsheet using structural parameters
             new_df = pd.DataFrame(new_rows)
             updated_master_df = pd.concat([df, new_df], ignore_index=True)
-            conn.update(spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet"], data=updated_master_df)
+            conn.update(spreadsheet=secrets_dict["spreadsheet"], data=updated_master_df)
             
             st.success("🎉 Evaluation captured securely inside the cloud database! Refresh page to update metrics.")
             st.balloons()
