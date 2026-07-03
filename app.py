@@ -5,6 +5,7 @@ import plotly.express as px
 import json
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
+from cryptography.hazmat.primitives import serialization
 
 # 1. Page Configuration
 st.set_page_config(
@@ -147,16 +148,32 @@ emoji_options = ["1 🤬", "2 🙁", "3 😐", "4 🙂", "5 🤩"]
 emoji_clean_map = {"1": "🤬", "2": "🙁", "3": "😐", "4": "🙂", "5": "🤩"}
 
 # ==========================================
-# 3. Cryptographic Backslash-n Repair Patch
+# 3. Cryptographic Runtime Interceptor Patch
 # ==========================================
-# Safely modifies the underlying raw dictionary directly to bypass read-only restriction
-if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
-    if "private_key" in st.secrets["connections"]["gsheets"]:
-        raw_key = st.secrets["connections"]["gsheets"]["private_key"]
-        cleaned_key = raw_key.replace("\\n", "\n").strip()
-        st.secrets._secrets["connections"]["gsheets"]["private_key"] = cleaned_key
+orig_load_pem_private_key = serialization.load_pem_private_key
 
-# Initialize Google Sheets Connection Wrapper
+def custom_load_pem_private_key(data, password=None, backend=None):
+    if isinstance(data, bytes):
+        try:
+            data_str = data.decode("utf-8", errors="ignore")
+            # Convert text-escaped newlines to actual structural breaks
+            data_str = data_str.replace("\\n", "\n").replace("\\\n", "\n").strip()
+            
+            # Reconstruct missing layout padding blocks if the string was flattened
+            if "-----BEGIN PRIVATE KEY-----" in data_str and "\n" not in data_str.replace("-----BEGIN PRIVATE KEY-----", "").strip():
+                body = data_str.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "").strip()
+                data_str = f"-----BEGIN PRIVATE KEY-----\n{body}\n-----END PRIVATE KEY-----\n"
+                
+            data = data_str.encode("utf-8")
+        except Exception:
+            pass
+            
+    return orig_load_pem_private_key(data, password, backend)
+
+# Hook the patch directly into the cryptography library before init
+serialization.load_pem_private_key = custom_load_pem_private_key
+
+# Initialize Google Sheets Connection Wrapper (Safely guarded by the interceptor)
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # Read dynamic layout database directly from Sheet1
@@ -301,12 +318,10 @@ with tab_survey:
                     "Tenure": survey_tenure
                 })
             
-            # Combine historical frame with freshly submitted block
             new_df = pd.DataFrame(new_rows)
             updated_master_df = pd.concat([df, new_df], ignore_index=True)
             
             try:
-                # Updated worksheet connection call parameters
                 conn.update(
                     spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet"], 
                     worksheet="Sheet1",
