@@ -147,25 +147,24 @@ emoji_options = ["1 🤬", "2 🙁", "3 😐", "4 🙂", "5 🤩"]
 emoji_clean_map = {"1": "🤬", "2": "🙁", "3": "😐", "4": "🙂", "5": "🤩"}
 
 # ==========================================
-# 3. Safe Secrets Format Normalization Patch
+# 3. Direct Connection Configuration Loader
 # ==========================================
-if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
-    if "private_key" in st.secrets["connections"]["gsheets"]:
-        raw_key = st.secrets["connections"]["gsheets"]["private_key"]
-        
-        # Convert literal string escape sequences into true structural breaks
-        cleaned_key = raw_key.replace("\\n", "\n").replace("\\\n", "\n").strip()
-        
-        # Reconstruct missing line padding blocks if the secret input was flattened completely
-        if "-----BEGIN PRIVATE KEY-----" in cleaned_key and "\n" not in cleaned_key.replace("-----BEGIN PRIVATE KEY-----", "").strip():
-            body = cleaned_key.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "").strip()
-            cleaned_key = f"-----BEGIN PRIVATE KEY-----\n{body}\n-----END PRIVATE KEY-----\n"
-            
-        # Write clean layout back to the hidden underlying configuration dictionary
-        st.secrets._secrets["connections"]["gsheets"]["private_key"] = cleaned_key
+# Safely extract values text parameters manually to avoid formatting conflicts
+gsheets_secrets = dict(st.secrets["connections"]["gsheets"])
 
-# Initialize Google Sheets Connection Wrapper
-conn = st.connection("gsheets", type=GSheetsConnection)
+if "private_key" in gsheets_secrets:
+    raw_key = gsheets_secrets["private_key"]
+    # Force fix line wraps safely
+    cleaned_key = raw_key.replace("\\n", "\n").replace("\\\n", "\n").strip()
+    
+    if "-----BEGIN PRIVATE KEY-----" in cleaned_key and "\n" not in cleaned_key.replace("-----BEGIN PRIVATE KEY-----", "").strip():
+        body = cleaned_key.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "").strip()
+        cleaned_key = f"-----BEGIN PRIVATE KEY-----\n{body}\n-----END PRIVATE KEY-----\n"
+        
+    gsheets_secrets["private_key"] = cleaned_key
+
+# Pass the cleanly formatted credentials dictionary directly into the connection object
+conn = st.connection("gsheets", type=GSheetsConnection, **gsheets_secrets)
 
 # Read dynamic layout database directly from Sheet1
 try:
