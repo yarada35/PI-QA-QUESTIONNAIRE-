@@ -168,13 +168,21 @@ DEPARTMENT_QUESTIONS = {
 emoji_options = ["1 🤬", "2 🙁", "3 😐", "4 🙂", "5 🤩"]
 emoji_clean_map = {"1": "🤬", "2": "🙁", "3": "😐", "4": "🙂", "5": "🤩"}
 
-# 3. Securely Fetch and Automatically Repair Private Key Encoding
-secrets_dict = dict(st.secrets["connections"]["gsheets"])
-if "private_key" in secrets_dict:
-    secrets_dict["private_key"] = secrets_dict["private_key"].replace("\\n", "\n")
-
-# Initialize connection by parsing the safely cleaned secrets explicitly
-conn = st.connection("gsheets", type=GSheetsConnection, **secrets_dict)
+# 3. Securely Initialize and Force-Inject Repaired Private Key
+try:
+    # 1. Initialize standard connection object instance natively
+    conn = st.connection("gsheets", type=GSheetsConnection)
+    
+    # 2. Extract and manually repair internal secrets string format 
+    secrets_dict = dict(st.secrets["connections"]["gsheets"])
+    if "private_key" in secrets_dict:
+        secrets_dict["private_key"] = secrets_dict["private_key"].replace("\\n", "\n")
+        
+    # 3. Force-inject our repaired dictionary safely back into the active instance configuration
+    conn._secrets = secrets_dict
+except Exception as conn_err:
+    st.error(f"Configuration fallback triggered: {conn_err}")
+    conn = st.connection("gsheets", type=GSheetsConnection)
 
 # Read live dataset dynamically (Bypass cache)
 try:
@@ -317,6 +325,8 @@ with tab_survey:
             # Save data back to spreadsheet using structural parameters
             new_df = pd.DataFrame(new_rows)
             updated_master_df = pd.concat([df, new_df], ignore_index=True)
+            
+            # Use the explicitly fixed dictionary credentials for update calls
             conn.update(spreadsheet=secrets_dict["spreadsheet"], data=updated_master_df)
             
             st.success("🎉 Evaluation captured securely inside the cloud database! Refresh page to update metrics.")
