@@ -168,16 +168,8 @@ DEPARTMENT_QUESTIONS = {
 emoji_options = ["1 🤬", "2 🙁", "3 😐", "4 🙂", "5 🤩"]
 emoji_clean_map = {"1": "🤬", "2": "🙁", "3": "😐", "4": "🙂", "5": "🤩"}
 
-# 3. Securely Initialize Connection Passing Secrets Explicitly
-conn = st.connection(
-    "gsheets",
-    type=GSheetsConnection,
-    spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet"],
-    project_id=st.secrets["connections"]["gsheets"]["project_id"],
-    private_key_id=st.secrets["connections"]["gsheets"]["private_key_id"],
-    private_key=st.secrets["connections"]["gsheets"]["private_key"],
-    client_email=st.secrets["connections"]["gsheets"]["client_email"]
-)
+# 3. Securely Initialize Connection natively from Streamlit Secrets
+conn = st.connection("gsheets", type=GSheetsConnection)
 
 # Read live dataset dynamically (Bypass cache)
 try:
