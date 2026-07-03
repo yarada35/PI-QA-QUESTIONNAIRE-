@@ -4,8 +4,7 @@ import numpy as np
 import plotly.express as px
 import json
 from datetime import datetime
-import gspread
-from google.oauth2.service_account import Credentials
+from streamlit_gsheets import GSheetsConnection
 
 # 1. Page Configuration
 st.set_page_config(
@@ -15,107 +14,85 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS Injection for Premium Black/Dark UI
+# Custom CSS Injection for Black/Dark Premium UI
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght=400;600;700&family=Syne:wght=700;800&family=Inter:wght=400;500;600;700&display=swap');
     
-    .stApp {
-        background-color: #05070F !important;
-        color: #F1F5F9 !important;
+    .stApp { 
+        background-color: #05070F !important; 
+        color: #F1F5F9 !important; 
     }
-    
-    [data-testid="stSidebar"] {
-        background-color: #090D16 !important;
-        border-right: 1px solid #1E293B !important;
+    [data-testid="stSidebar"] { 
+        background-color: #090D16 !important; 
+        border-right: 1px solid #1E293B !important; 
     }
-    
     [data-testid="stSidebar"] .stRadio [data-testid="stWidgetLabel"] + div label p {
-        font-family: 'Space Grotesk', sans-serif !important;
+        font-family: 'Space Grotesk', sans-serif !important; 
         color: #FBBF24 !important;
-        font-weight: 700 !important;
+        font-weight: 700 !important; 
         font-size: 1.1rem !important;
         text-shadow: 0px 0px 8px rgba(251, 191, 36, 0.6) !important;
     }
-    
     .main h1 {
-        font-family: 'Syne', sans-serif;
+        font-family: 'Syne', sans-serif; 
         font-weight: 800;
         background: linear-gradient(135deg, #38BDF8 0%, #34D399 50%, #FBBF24 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        -webkit-background-clip: text; 
+        -webkit-text-fill-color: transparent; 
         font-size: 3rem !important;
-        letter-spacing: -0.05em;
-        margin-bottom: 0.5rem;
     }
-    
     .section-title {
-        font-family: 'Syne', sans-serif;
-        color: #F8FAFC;
-        font-size: 1.5rem;
+        font-family: 'Syne', sans-serif; 
+        color: #F8FAFC; 
+        font-size: 1.5rem; 
         font-weight: 700;
-        border-bottom: 2px solid #38BDF8;
-        padding-bottom: 0.4rem;
-        margin-top: 1.5rem;
+        border-bottom: 2px solid #38BDF8; 
+        padding-bottom: 0.4rem; 
+        margin-top: 1.5rem; 
         margin-bottom: 1.5rem;
     }
-
-    body, p, label {
-        font-family: 'Inter', sans-serif;
-    }
-    
-    .stTabs [data-baseweb="tab-list"] button {
-        font-size: 1.6rem !important;
-        font-weight: 800 !important;
-        color: #94A3B8 !important;
-        padding: 12px 24px !important;
-        font-family: 'Syne', sans-serif !important;
-    }
-    
-    .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
-        color: #34D399 !important;
-        border-bottom: 4px solid #34D399 !important;
-        text-shadow: 0px 0px 12px rgba(52, 211, 153, 0.6);
-    }
-    
     .metric-card {
-        background: #111827;
-        border-radius: 16px;
-        padding: 24px;
+        background: #111827; 
+        border-radius: 16px; 
+        padding: 24px; 
         border: 1px solid #1E293B;
-        border-left: 6px solid #38BDF8;
+        border-left: 6px solid #38BDF8; 
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
     }
-
-    .question-block {
-        background: #111827;
-        border: 1px solid #1E293B;
-        border-radius: 12px;
-        padding: 20px;
+    .question-block { 
+        background: #111827; 
+        border: 1px solid #1E293B; 
+        border-radius: 12px; 
+        padding: 20px; 
     }
-
-    .question-text {
-        font-family: 'Inter', sans-serif;
-        font-size: 1.05rem;
-        font-weight: 500;
-        color: #F8FAFC;
+    .question-text { 
+        font-family: 'Inter', sans-serif; 
+        font-size: 1.05rem; 
+        color: #F8FAFC; 
     }
-
     .scale-legend {
-        background-color: #090D16;
-        border: 1px solid #1E293B;
+        background-color: #090D16; 
+        border: 1px solid #1E293B; 
         border-radius: 8px;
-        padding: 12px;
-        margin-bottom: 2rem;
-        display: flex;
-        justify-content: space-around;
+        padding: 12px; 
+        margin-bottom: 2rem; 
+        display: flex; 
+        justify-content: space-around; 
         font-size: 0.85rem;
-        color: #CBD5E1;
+    }
+    .stTabs [data-baseweb="tab-list"] button {
+        font-size: 1.6rem !important; 
+        font-weight: 800 !important; 
+        font-family: 'Syne', sans-serif !important;
+    }
+    .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] { 
+        color: #34D399 !important; 
     }
     </style>
 """, unsafe_allow_html=True)
 
-# 2. Hardcoded Survey Matrix Verbatim Mapping
+# 2. Hardcoded Operational Question Matrix Mapping
 DEPARTMENT_QUESTIONS = {
     "Plant Engineering Department": [
         "Provide technical data and specification as per the request",
@@ -169,50 +146,22 @@ DEPARTMENT_QUESTIONS = {
 emoji_options = ["1 🤬", "2 🙁", "3 😐", "4 🙂", "5 🤩"]
 emoji_clean_map = {"1": "🤬", "2": "🙁", "3": "😐", "4": "🙂", "5": "🤩"}
 
-# 3. Direct Native Google Auth Client (Bypasses streamlit-gsheets helper library completely)
-@st.cache_resource(ttl="1h")
-def get_gspread_client():
-    # Gather raw values
-    s = st.secrets["connections"]["gsheets"]
-    
-    # Clean the private key string programmatically from any typos or double escaped values
-    pk = s["private_key"].replace("\\n", "\n")
-    if pk.startswith("____"):  # Fixes underscore typos at start
-        pk = "-----" + pk.lstrip("_")
-    
-    info = {
-        "type": s["type"],
-        "project_id": s["project_id"],
-        "private_key_id": s["private_key_id"],
-        "private_key": pk,
-        "client_email": s["client_email"],
-        "token_uri": s["token_uri"]
-    }
-    
-    scopes = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive"
-    ]
-    
-    creds = Credentials.from_service_account_info(info, scopes=scopes)
-    return gspread.authorize(creds)
+# 3. Cryptographic Backslash-n Repair Patch
+# Forces dynamic transformation of literal text keys before GSheets Connection reads it.
+if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
+    if "private_key" in st.secrets["connections"]["gsheets"]:
+        raw_key = st.secrets["connections"]["gsheets"]["private_key"]
+        cleaned_key = raw_key.replace("\\n", "\n").strip()
+        st.secrets["connections"]["gsheets"]["private_key"] = cleaned_key
 
-# Connect & Fetch Sheet Data dynamically
+# Initialize Google Sheets Connection Wrapper
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+# Read dynamic layout database directly from Sheet1
 try:
-    gc = get_gspread_client()
-    spreadsheet_url = st.secrets["connections"]["gsheets"]["spreadsheet"]
-    sh = gc.open_by_url(spreadsheet_url)
-    worksheet = sh.get_worksheet(0) # Grabs first sheet tab
-    
-    # Convert sheet rows cleanly into a Pandas Dataframe
-    records = worksheet.get_all_records()
-    if records:
-        df = pd.DataFrame(records)
-        df['Score'] = pd.to_numeric(df['Score'], errors='coerce')
-    else:
-        df = pd.DataFrame(columns=["RespondentID", "Department", "Question Number", "Criteria Description", "Score", "Emoji", "Sentiment", "Tenure"])
+    df = conn.read(worksheet="Sheet1", ttl="0d")
+    df['Score'] = pd.to_numeric(df['Score'], errors='coerce')
 except Exception as e:
-    st.error(f"Google Cloud Authorization Connection Error: {e}")
     df = pd.DataFrame(columns=["RespondentID", "Department", "Question Number", "Criteria Description", "Score", "Emoji", "Sentiment", "Tenure"])
 
 def clear_global_filters():
@@ -221,11 +170,11 @@ def clear_global_filters():
             del st.session_state[k]
     st.rerun()
 
-# Layout Headers
+# Layout Banner Headers
 st.markdown("<h1>PIQA Live Matrix Portal</h1>", unsafe_allow_html=True)
 st.markdown("<p style='color:#94A3B8; font-size:1.1rem; margin-bottom: 1.5rem;'>Unified suite for live operational analysis and internal raw feedback collection loops.</p>", unsafe_allow_html=True)
 
-# 4. Sidebar Controls
+# 4. Global Control Room Sidebar Configuration
 with st.sidebar:
     st.markdown("<h2 style='font-family:\"Syne\"; color:#38BDF8; margin-top:0;'>🎨 Control Room</h2>", unsafe_allow_html=True)
     st.markdown("<hr style='border-color: #1E293B;'/>", unsafe_allow_html=True)
@@ -239,7 +188,7 @@ with st.sidebar:
     st.markdown("<hr style='border-color: #1E293B;'/>", unsafe_allow_html=True)
     selected_tenure = st.segmented_control(
         label="Employee Tenure Filter",
-        options=['All Mix', '< 1 Year', '1-3 Years', '3+ Years'],
+        options=['All Mix'] + ['< 1 Year', '1-3 Years', '3+ Years'],
         default='All Mix',
         key="dash_tenure_seg"
     )
@@ -247,14 +196,14 @@ with st.sidebar:
     st.markdown("<hr style='border-color: #1E293B;'/>", unsafe_allow_html=True)
     st.button("🔄 Clear App Filters", on_click=clear_global_filters, use_container_width=True)
 
-# Process Filter Slices
+# Filter Processing Engine Slices
 filtered_df = df.dropna(subset=['Score']).copy() if not df.empty else df.copy()
 if selected_dept != 'All Matrix Mix':
     filtered_df = filtered_df[filtered_df['Department'] == selected_dept]
 if selected_tenure != 'All Mix':
     filtered_df = filtered_df[filtered_df['Tenure'] == selected_tenure]
 
-# Structural View Management Tabs
+# Structural Tabs Initialization
 tab_dash, tab_survey, tab_print = st.tabs(["📊 Live Analytics Dashboard", "📝 Interactive Survey Intake", "🖨️ Print & Distribution Hub"])
 
 # ==========================================
@@ -271,29 +220,33 @@ with tab_dash:
         with col1:
             st.markdown(f'<div class="metric-card"><p style="color:#94A3B8; font-size: 0.8rem; text-transform: uppercase; font-weight:600; margin-bottom:4px;">Composite Mean Score</p><h2 style="font-family:\'Space Grotesk\'; font-size:2.2rem; color:#F8FAFC; margin:0;">{avg_score} <span style="font-size:1.2rem; color:#38BDF8;">/ 5.0</span></h2></div>', unsafe_allow_html=True)
         with col2:
-            st.markdown(f'<div class="metric-card" style="border-left-color: #34D399;"><p style="color:#34D399; font-size: 0.8rem; text-transform: uppercase; font-weight:600; margin-bottom:4px;">Total Sample Respondents</p><h2 style="font-family:\'Space Grotesk\'; font-size:2.2rem; color:#F8FAFC; margin:0;">{distinct_active_respondents} <span style="font-size:1.1rem; color:#94A3B8;">Staff</span></h2></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card" style="border-left-color: #34D399;"><p style="color:#34D399; font-size: 0.8rem; text-transform: uppercase; font-weight:600; margin-bottom:4px;">Total Valid Submissions</p><h2 style="font-family:\'Space Grotesk\'; font-size:2.2rem; color:#F8FAFC; margin:0;">{distinct_active_respondents} <span style="font-size:1.1rem; color:#94A3B8;">Staff</span></h2></div>', unsafe_allow_html=True)
         with col3:
             pos_pct = round((len(filtered_df[filtered_df['Sentiment'] == 'Positive']) / len(filtered_df)) * 100)
             st.markdown(f'<div class="metric-card" style="border-left-color: #34D399;"><p style="color:#94A3B8; font-size: 0.8rem; text-transform: uppercase; font-weight:600; margin-bottom:4px;">Satisfaction Index</p><h2 style="font-family:\'Space Grotesk\'; font-size:2.2rem; color:#F8FAFC; margin:0;">{pos_pct}%</h2></div>', unsafe_allow_html=True)
         with col4:
-            mode_score = int(filtered_df['Score'].mode()[0])
-            st.markdown(f'<div class="metric-card" style="border-left-color: #FBBF24;"><p style="color:#94A3B8; font-size: 0.8rem; text-transform: uppercase; font-weight:600; margin-bottom:4px;">Dominant Sentiment</p><h2 style="font-family:\'Space Grotesk\'; font-size:2.2rem; color:#F8FAFC; margin:0;">Level {mode_score}</h2></div>', unsafe_allow_html=True)
+            mode_score = int(filtered_df['Score'].mode()[0]) if not filtered_df.empty else 3
+            st.markdown(f'<div class="metric-card" style="border-left-color: #FBBF24;"><p style="color:#94A3B8; font-size: 0.8rem; text-transform: uppercase; font-weight:600; margin-bottom:4px;">Dominant Score Profile</p><h2 style="font-family:\'Space Grotesk\'; font-size:2.2rem; color:#F8FAFC; margin:0;">Level {mode_score}</h2></div>', unsafe_allow_html=True)
 
         st.markdown("<div class='section-title'>📋 Response Volume Layout Breakdown</div>", unsafe_allow_html=True)
-        respondent_matrix = filtered_df.groupby(['Department', 'Tenure'])['RespondentID'].nunique().unstack(fill_value=0)
-        st.dataframe(respondent_matrix, use_container_width=True)
+        try:
+            respondent_matrix = filtered_df.groupby(['Department', 'Tenure'])['RespondentID'].nunique().unstack(fill_value=0)
+            st.dataframe(respondent_matrix, use_container_width=True)
+        except Exception:
+            st.dataframe(filtered_df[['RespondentID', 'Department', 'Tenure']].drop_duplicates(), use_container_width=True)
 
         c1, c2 = st.columns([3, 2])
         with c1:
             st.markdown("<div class='section-title'>📊 Average Ratings by Query Breakdown</div>", unsafe_allow_html=True)
             question_chart_data = filtered_df.groupby('Criteria Description')['Score'].mean().reset_index().sort_values(by='Score')
             fig_bar = px.bar(question_chart_data, x='Score', y='Criteria Description', orientation='h', color='Score', color_continuous_scale='Blues', range_x=[1,5], template="plotly_dark")
-            fig_bar.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_family="Inter", yaxis=dict(showticklabels=False))
+            fig_bar.update_layout(yaxis=dict(showticklabels=False, title=None), plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
             st.plotly_chart(fig_bar, use_container_width=True)
         with c2:
-            st.markdown("<div class='section-title'>🍕 Proportion Summary</div>", unsafe_allow_html=True)
+            st.markdown("<div class='section-title'>🍕 Sentiment Proportions</div>", unsafe_allow_html=True)
             sentiment_data = filtered_df['Sentiment'].value_counts().reset_index()
             fig_pie = px.pie(sentiment_data, values='count', names='Sentiment', hole=0.5, template="plotly_dark")
+            fig_pie.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
             st.plotly_chart(fig_pie, use_container_width=True)
 
 # ==========================================
@@ -346,21 +299,70 @@ with tab_survey:
                     "Tenure": survey_tenure
                 })
             
+            # Combine historical frame with freshly submitted block
+            new_df = pd.DataFrame(new_rows)
+            updated_master_df = pd.concat([df, new_df], ignore_index=True)
+            
             try:
-                # Direct worksheet rows insertion
-                for row in new_rows:
-                    worksheet.append_row(list(row.values()))
+                # Fixed worksheet definition call parameters
+                conn.update(
+                    spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet"], 
+                    worksheet="Sheet1",
+                    data=updated_master_df
+                )
                 st.success("🎉 Evaluation captured securely inside the cloud database! Refresh page to update metrics.")
                 st.balloons()
-            except Exception as append_err:
-                st.error(f"Failed to submit row data: {append_err}")
+            except Exception as e:
+                st.error(f"Failed to submit row data: {e}")
 
 # ==========================================
-# VIEW 3: PRINT & EXPORT
+# VIEW 3: PRINT & DISTRIBUTION HUB
 # ==========================================
 with tab_print:
-    st.markdown("<div class='section-title'>🖨️ Document Generation Center</div>", unsafe_allow_html=True)
-    if not filtered_df.empty:
-        st.download_button("📥 Export Current Slice Dataset to CSV", data=filtered_df.to_csv(index=False).encode('utf-8'), file_name="PIQA_Live_Data.csv", mime="text/csv")
-    else:
-        st.write("No active records available to download.")
+    st.markdown("<div class='section-title'>🖨 nighttime Document Generation Center</div>", unsafe_allow_html=True)
+    
+    c_print_1, c_print_2 = st.columns([1, 2])
+    with c_print_1:
+        st.markdown("### 📄 Print Configuration Configuration")
+        enable_print_mode = st.toggle("✨ Activate High-Contrast Print View Mode", value=False)
+        
+        if enable_print_mode:
+            st.markdown("""
+                <style>
+                .stApp { background-color: #FFFFFF !important; color: #000000 !important; }
+                [data-testid="stSidebar"] { display: none !important; }
+                .metric-card { background: #FFFFFF !important; border: 2px solid #000000 !important; color: #000000 !important; box-shadow: none !important; }
+                .metric-card h2, .metric-card p { color: #000000 !important; }
+                h1, .section-title, p, span { color: #000000 !important; background: none !important; -webkit-text-fill-color: initial !important; border-bottom-color: #000000 !important;}
+                header, [data-testid="stHeader"] { display: none !important; }
+                </style>
+            """, unsafe_allow_html=True)
+            st.info("💡 Print Mode Active! Press Ctrl+P (or Cmd+P) to print or generate a clean local PDF.")
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        if not filtered_df.empty:
+            st.download_button(
+                label="📥 Export Current Slice Dataset to CSV", 
+                data=filtered_df.to_csv(index=False).encode('utf-8'), 
+                file_name=f"PIQA_Live_Export_{datetime.now().strftime('%Y%m%d')}.csv", 
+                mime="text/csv",
+                use_container_width=True
+            )
+    
+    with c_print_2:
+        st.markdown("### 🔗 Share Snapshot Details")
+        if not filtered_df.empty:
+            distinct_active_respondents = filtered_df['RespondentID'].nunique()
+            avg_score = round(filtered_df['Score'].mean(), 2)
+            summary_share_string = f"""--- PIQA FIELD OPERATIONAL SNAPSHOT PROFILE ---
+Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}
+Target Scope Segment: {selected_dept}
+Employee Tenure Profile Mix: {selected_tenure}
+---------------------------------------------
+* Total Validated Respondents Group: {distinct_active_respondents} Staff
+* Active Composite Mean Metric Score: {avg_score} / 5.0
+* Current Operational Quality Index Status: {"⚠️ Threshold Gaps" if avg_score < 3.8 else "✅ Healthy Baseline"}
+---------------------------------------------"""
+            st.text_area("📋 Copy Distribution Summary Block:", value=summary_share_string, height=180)
+        else:
+            st.write("No active metrics data loop to profile.")
