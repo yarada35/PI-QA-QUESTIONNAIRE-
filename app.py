@@ -147,24 +147,26 @@ emoji_options = ["1 🤬", "2 🙁", "3 😐", "4 🙂", "5 🤩"]
 emoji_clean_map = {"1": "🤬", "2": "🙁", "3": "😐", "4": "🙂", "5": "🤩"}
 
 # ==========================================
-# 3. Direct Connection Configuration Loader
+# 3. Clean Internal Secrets Sanitization
 # ==========================================
-# Safely extract values text parameters manually to avoid formatting conflicts
-gsheets_secrets = dict(st.secrets["connections"]["gsheets"])
-
-if "private_key" in gsheets_secrets:
-    raw_key = gsheets_secrets["private_key"]
-    # Force fix line wraps safely
-    cleaned_key = raw_key.replace("\\n", "\n").replace("\\\n", "\n").strip()
-    
-    if "-----BEGIN PRIVATE KEY-----" in cleaned_key and "\n" not in cleaned_key.replace("-----BEGIN PRIVATE KEY-----", "").strip():
-        body = cleaned_key.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "").strip()
-        cleaned_key = f"-----BEGIN PRIVATE KEY-----\n{body}\n-----END PRIVATE KEY-----\n"
+# Instead of passing as kwargs, update Streamlit's target secrets backend safely
+if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
+    if "private_key" in st.secrets["connections"]["gsheets"]:
+        raw_key = st.secrets["connections"]["gsheets"]["private_key"]
         
-    gsheets_secrets["private_key"] = cleaned_key
+        # Clean literal slash-n strings into true carriage returns
+        cleaned_key = raw_key.replace("\\n", "\n").replace("\\\n", "\n").strip()
+        
+        # Build back structural multiline spacing blocks if completely flattened
+        if "-----BEGIN PRIVATE KEY-----" in cleaned_key and "\n" not in cleaned_key.replace("-----BEGIN PRIVATE KEY-----", "").strip():
+            body = cleaned_key.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "").strip()
+            cleaned_key = f"-----BEGIN PRIVATE KEY-----\n{body}\n-----END PRIVATE KEY-----\n"
+            
+        # Update Streamlit's active background memory object directly
+        st.secrets._secrets["connections"]["gsheets"]["private_key"] = cleaned_key
 
-# Pass the cleanly formatted credentials dictionary directly into the connection object
-conn = st.connection("gsheets", type=GSheetsConnection, **gsheets_secrets)
+# Now call the natural connector without kwargs to avoid the type constraint check
+conn = st.connection("gsheets", type=GSheetsConnection)
 
 # Read dynamic layout database directly from Sheet1
 try:
