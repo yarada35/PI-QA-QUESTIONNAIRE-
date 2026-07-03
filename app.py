@@ -4,7 +4,8 @@ import numpy as np
 import plotly.express as px
 import json
 from datetime import datetime
-from streamlit_gsheets import GSheetsConnection
+import gspread
+from google.oauth2.service_account import Credentials
 
 # 1. Page Configuration
 st.set_page_config(
@@ -168,27 +169,50 @@ DEPARTMENT_QUESTIONS = {
 emoji_options = ["1 🤬", "2 🙁", "3 😐", "4 🙂", "5 🤩"]
 emoji_clean_map = {"1": "🤬", "2": "🙁", "3": "😐", "4": "🙂", "5": "🤩"}
 
-# 3. Securely Initialize and Force-Inject Repaired Private Key
-try:
-    # 1. Initialize standard connection object instance natively
-    conn = st.connection("gsheets", type=GSheetsConnection)
+# 3. Direct Native Google Auth Client (Bypasses streamlit-gsheets helper library completely)
+@st.cache_resource(ttl="1h")
+def get_gspread_client():
+    # Gather raw values
+    s = st.secrets["connections"]["gsheets"]
     
-    # 2. Extract and manually repair internal secrets string format 
-    secrets_dict = dict(st.secrets["connections"]["gsheets"])
-    if "private_key" in secrets_dict:
-        secrets_dict["private_key"] = secrets_dict["private_key"].replace("\\n", "\n")
-        
-    # 3. Force-inject our repaired dictionary safely back into the active instance configuration
-    conn._secrets = secrets_dict
-except Exception as conn_err:
-    st.error(f"Configuration fallback triggered: {conn_err}")
-    conn = st.connection("gsheets", type=GSheetsConnection)
+    # Clean the private key string programmatically from any typos or double escaped values
+    pk = s["private_key"].replace("\\n", "\n")
+    if pk.startswith("____"):  # Fixes underscore typos at start
+        pk = "-----" + pk.lstrip("_")
+    
+    info = {
+        "type": s["type"],
+        "project_id": s["project_id"],
+        "private_key_id": s["private_key_id"],
+        "private_key": pk,
+        "client_email": s["client_email"],
+        "token_uri": s["token_uri"]
+    }
+    
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    
+    creds = Credentials.from_service_account_info(info, scopes=scopes)
+    return gspread.authorize(creds)
 
-# Read live dataset dynamically (Bypass cache)
+# Connect & Fetch Sheet Data dynamically
 try:
-    df = conn.read(ttl="0d")
-    df['Score'] = pd.to_numeric(df['Score'], errors='coerce')
+    gc = get_gspread_client()
+    spreadsheet_url = st.secrets["connections"]["gsheets"]["spreadsheet"]
+    sh = gc.open_by_url(spreadsheet_url)
+    worksheet = sh.get_worksheet(0) # Grabs first sheet tab
+    
+    # Convert sheet rows cleanly into a Pandas Dataframe
+    records = worksheet.get_all_records()
+    if records:
+        df = pd.DataFrame(records)
+        df['Score'] = pd.to_numeric(df['Score'], errors='coerce')
+    else:
+        df = pd.DataFrame(columns=["RespondentID", "Department", "Question Number", "Criteria Description", "Score", "Emoji", "Sentiment", "Tenure"])
 except Exception as e:
+    st.error(f"Google Cloud Authorization Connection Error: {e}")
     df = pd.DataFrame(columns=["RespondentID", "Department", "Question Number", "Criteria Description", "Score", "Emoji", "Sentiment", "Tenure"])
 
 def clear_global_filters():
@@ -322,15 +346,14 @@ with tab_survey:
                     "Tenure": survey_tenure
                 })
             
-            # Save data back to spreadsheet using structural parameters
-            new_df = pd.DataFrame(new_rows)
-            updated_master_df = pd.concat([df, new_df], ignore_index=True)
-            
-            # Use the explicitly fixed dictionary credentials for update calls
-            conn.update(spreadsheet=secrets_dict["spreadsheet"], data=updated_master_df)
-            
-            st.success("🎉 Evaluation captured securely inside the cloud database! Refresh page to update metrics.")
-            st.balloons()
+            try:
+                # Direct worksheet rows insertion
+                for row in new_rows:
+                    worksheet.append_row(list(row.values()))
+                st.success("🎉 Evaluation captured securely inside the cloud database! Refresh page to update metrics.")
+                st.balloons()
+            except Exception as append_err:
+                st.error(f"Failed to submit row data: {append_err}")
 
 # ==========================================
 # VIEW 3: PRINT & EXPORT
