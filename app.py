@@ -9,15 +9,21 @@ st.set_page_config(page_title="PIQA Analytics & Survey Hub", layout="wide")
 @st.cache_resource(ttl="1h")
 def get_gspread_client():
     gs = st.secrets["connections"]["gsheets"]
-    
-    # 1. Extract raw key
     raw_key = str(gs.get("private_key", ""))
     
-    # 2. AGGRESSIVE CLEANUP: 
-    # This regex removes EVERYTHING except A-Z, a-z, 0-9, +, /, and =
+    # Debug: Print the length of the raw input
+    print(f"DEBUG: Raw key length: {len(raw_key)}")
+    
+    # Extract only the base64 content
     clean_base64 = re.sub(r'[^A-Za-z0-9+/=]', '', raw_key)
     
-    # 3. Reconstruct into standard 64-char lines to satisfy PEM requirements
+    # Debug: Print the length after cleaning
+    print(f"DEBUG: Cleaned base64 length: {len(clean_base64)}")
+    
+    if len(clean_base64) < 500:
+        raise ValueError(f"Key is too short! Length: {len(clean_base64)}. Check your secrets.toml.")
+
+    # Reconstruct PEM format
     chunks = [clean_base64[i:i+64] for i in range(0, len(clean_base64), 64)]
     formatted_key = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(chunks) + "\n-----END PRIVATE KEY-----\n"
     
@@ -46,7 +52,7 @@ def main():
         st.success("✅ Dashboard connected.")
     except Exception as e:
         st.error(f"Authentication Failed: {e}")
-        st.info("The system is still detecting invalid characters in your 'private_key'.")
+        st.info("Check your 'private_key' in Streamlit Secrets. It appears to be truncated or contains invalid formatting.")
 
 if __name__ == "__main__":
     main()
