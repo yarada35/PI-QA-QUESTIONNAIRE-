@@ -155,44 +155,44 @@ emoji_clean_map = {"1": "🤬", "2": "🙁", "3": "😐", "4": "🙂", "5": "�
 # ==========================================
 @st.cache_resource(ttl="1h")
 def get_gspread_client():
-    # Scopes needed for Google Sheets and Google Drive connection
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive"
     ]
     
-    # 1. Pull the raw service account layout details from secrets context safely
+    # 1. Resolve secrets dictionary hierarchy dynamically
+    g_secrets = {}
     if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
         g_secrets = dict(st.secrets["connections"]["gsheets"])
     else:
-        # Fallback if your layout structure is root-level keys
         g_secrets = dict(st.secrets)
 
-    # 2. Extract and sanitize the private key string manually
+    # 2. Extract and rigorously repair the private key envelope layout
     if "private_key" in g_secrets:
-        raw_key = g_secrets["private_key"]
+        raw_key = str(g_secrets["private_key"])
         
-        # Remove literal wrap quotes if present
+        # Strip literal surrounding quotes if present from string configurations
         if (raw_key.startswith('"') and raw_key.endswith('"')) or (raw_key.startswith("'") and raw_key.endswith("'")):
             raw_key = raw_key[1:-1]
             
-        # Replace explicit string literal character escapes with structural line returns
+        # Standardize real newlines (fixes double escaping from configurations)
         raw_key = raw_key.replace("\\n", "\n")
         
-        # Build pristine clean lines framework
+        # Clean up lines individually and eliminate empty gaps
         lines = [line.strip() for line in raw_key.split("\n") if line.strip()]
-        cleaned_lines = []
-        for line in lines:
-            if "BEGIN PRIVATE KEY" in line:
-                cleaned_lines.append("-----BEGIN PRIVATE KEY-----")
-            elif "END PRIVATE KEY" in line:
-                cleaned_lines.append("-----END PRIVATE KEY-----")
-            else:
-                cleaned_lines.append(line)
         
-        g_secrets["private_key"] = "\n".join(cleaned_lines)
+        # Re-assemble only the base64 payload body
+        cleaned_body = []
+        for line in lines:
+            if "BEGIN PRIVATE KEY" in line or "END PRIVATE KEY" in line:
+                continue
+            cleaned_body.append(line)
+            
+        # Enforce structural envelope to bypass the Cryptography formatting bug
+        final_pem_key = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(cleaned_body) + "\n-----END PRIVATE KEY-----\n"
+        g_secrets["private_key"] = final_pem_key
 
-    # 3. Fallback assignments if keys are named differently in secrets.toml configuration
+    # 3. Gather standard keys needed for JSON payload matching Google service requirements
     info_keys = ["type", "project_id", "private_key_id", "private_key", "client_email", "client_id", "auth_uri", "token_uri", "auth_provider_x509_cert_url", "client_x509_cert_url"]
     credentials_info = {k: g_secrets.get(k) for k in info_keys if k in g_secrets}
 
@@ -200,11 +200,9 @@ def get_gspread_client():
     creds = service_account.Credentials.from_service_account_info(credentials_info, scopes=scopes)
     return gspread.authorize(creds)
 
-# Helper functions to replace conn.read() and conn.update()
 def read_gsheet_data(spreadsheet_url_or_name, worksheet_name="Sheet1"):
     try:
         client = get_gspread_client()
-        # Open by URL if provided, otherwise open by name context
         if spreadsheet_url_or_name.startswith("http"):
             sheet = client.open_by_url(spreadsheet_url_or_name).worksheet(worksheet_name)
         else:
@@ -223,14 +221,17 @@ def update_gsheet_data(spreadsheet_url_or_name, dataframe, worksheet_name="Sheet
     else:
         sheet = client.open(spreadsheet_url_or_name).worksheet(worksheet_name)
         
-    # Clear spreadsheet and write updated dataframe columns + data matrix rows
     sheet.clear()
     sheet.update([dataframe.columns.values.tolist()] + dataframe.fillna("").values.tolist())
 
-# Fetch spreadsheet identifier from configurations context
-spreadsheet_target = st.secrets["connections"]["gsheets"].get("spreadsheet", "")
-if not spreadsheet_target:
-    spreadsheet_target = st.secrets["connections"]["gsheets"].get("url", "Sheet1")
+# Fetch spreadsheet targets cleanly
+spreadsheet_target = ""
+if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
+    spreadsheet_target = st.secrets["connections"]["gsheets"].get("spreadsheet", "")
+    if not spreadsheet_target:
+        spreadsheet_target = st.secrets["connections"]["gsheets"].get("url", "")
+else:
+    spreadsheet_target = st.secrets.get("spreadsheet", st.secrets.get("url", ""))
 
 # Load operational dataframe from data store engine
 df = read_gsheet_data(spreadsheet_target, "Sheet1")
@@ -375,7 +376,6 @@ with tab_survey:
                 })
             
             new_df = pd.DataFrame(new_rows)
-            # Match existing schema explicitly
             for col in df.columns:
                 if col not in new_df.columns:
                     new_df[col] = ""
