@@ -146,35 +146,52 @@ emoji_options = ["1 🤬", "2 🙁", "3 😐", "4 🙂", "5 🤩"]
 emoji_clean_map = {"1": "🤬", "2": "🙁", "3": "😐", "4": "🙂", "5": "🤩"}
 
 # ==========================================
-# 3. Dynamic Service Account Key Sanitization
+# 3. Explicit Connection Credentials Configuration
 # ==========================================
-if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
-    if "private_key" in st.secrets["connections"]["gsheets"]:
-        raw_key = st.secrets["connections"]["gsheets"]["private_key"]
-        
-        # 1. Strip out literal strings, double quotes, and clean outer whitespaces
-        clean_key = raw_key.replace("\\n", "\n").replace('\\"', '').replace('"', '').strip()
-        
-        # 2. Isolate the base64 crypto block body
-        header = "-----BEGIN PRIVATE KEY-----"
-        footer = "-----END PRIVATE KEY-----"
-        body = clean_key.replace(header, "").replace(footer, "").replace("\n", "").replace(" ", "").strip()
-        
-        # 3. Rebuild lines into exactly 64 characters to satisfy crypto loader standards
-        chunks = [body[i:i+64] for i in range(0, len(body), 64)]
-        formatted_private_key = f"{header}\n" + "\n".join(chunks) + f"\n{footer}\n"
-        
-        # 4. Inject perfectly structured block string back to Streamlit state
-        st.secrets._secrets["connections"]["gsheets"]["private_key"] = formatted_private_key
+# PASTE YOUR FULL, UNALTERED PRIVATE KEY STRINGS AND PARAMETERS HERE DIRECTLY
+GOOGLE_CREDENTIALS_DATA = {
+    "type": "service_account",
+    "project_id": "YOUR_PROJECT_ID",
+    "private_key_id": "YOUR_PRIVATE_KEY_ID",
+    "private_key": "-----BEGIN PRIVATE KEY-----\nPASTE_YOUR_LONG_CRYPTO_KEY_STRING_HERE\n-----END PRIVATE KEY-----\n",
+    "client_email": "YOUR_SERVICE_ACCOUNT_EMAIL@PROJECT.iam.gserviceaccount.com",
+    "client_id": "YOUR_CLIENT_ID",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/YOUR_SERVICE_ACCOUNT_EMAIL"
+}
 
-# Load connection cleanly
+TARGET_SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID_HERE"
+
+# Clean up private key string whitespace or literal slash-n artifacts natively
+if "private_key" in GOOGLE_CREDENTIALS_DATA:
+    raw_key = GOOGLE_CREDENTIALS_DATA["private_key"].replace("\\n", "\n").strip()
+    header = "-----BEGIN PRIVATE KEY-----"
+    footer = "-----END PRIVATE KEY-----"
+    body = raw_key.replace(header, "").replace(footer, "").replace("\n", "").replace(" ", "").strip()
+    chunks = [body[i:i+64] for i in range(0, len(body), 64)]
+    GOOGLE_CREDENTIALS_DATA["private_key"] = f"{header}\n" + "\n".join(chunks) + f"\n{footer}\n"
+
+# Force inject credentials cleanly directly into Streamlit's memory system map
+st.secrets._secrets.clear()
+st.secrets._secrets["connections"] = {
+    "gsheets": {
+        "spreadsheet": TARGET_SPREADSHEET_URL,
+        "type": "service_account",
+        **GOOGLE_CREDENTIALS_DATA
+    }
+}
+
+# Load standard connection architecture safely 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Read database directly from target workspace Sheet1
+# Read master database directly from worksheet Sheet1
 try:
     df = conn.read(worksheet="Sheet1", ttl="0d")
     df['Score'] = pd.to_numeric(df['Score'], errors='coerce')
 except Exception as e:
+    st.error(f"Database Read Warning: {e}")
     df = pd.DataFrame(columns=["RespondentID", "Department", "Question Number", "Criteria Description", "Score", "Emoji", "Sentiment", "Tenure"])
 
 def clear_global_filters():
