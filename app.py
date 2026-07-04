@@ -4,7 +4,6 @@ import numpy as np
 import plotly.express as px
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
-import re
 
 # ==========================================
 # 1. PAGE & INITIALIZATION SETUP
@@ -151,20 +150,23 @@ emoji_options = ["1 🤬", "2 🙁", "3 😐", "4 🙂", "5 🤩"]
 emoji_clean_map = {"1": "🤬", "2": "🙁", "3": "😐", "4": "🙂", "5": "🤩"}
 
 # ==========================================
-# 3. EXPLICIT CONNECTION CONFIGURATION
+# 3. DIRECT CONNECTION INJECTION (NO ST.SECRETS HACK)
 # ==========================================
-if "connections" not in st.secrets._secrets:
-    st.secrets._secrets["connections"] = {}
+# 🚨 Replace these strings with your actual downloaded credentials data.
+# 🚨 Ensure the private key does not contain any indent spaces at the start of lines.
+RAW_PRIVATE_KEY = """-----BEGIN PRIVATE KEY-----
+PASTE_YOUR_LONG_CRYPTO_KEY_STRING_HERE
+-----END PRIVATE KEY-----"""
 
-# 🚨 CRITICAL: You MUST replace these placeholder strings with your actual downloaded JSON values!
-GOOGLE_CREDENTIALS_DATA = {
+# Advanced raw data scrubber to isolate pure cryptographic structural text
+scrubbed_key = "\n".join([line.strip() for line in RAW_PRIVATE_KEY.splitlines() if line.strip()])
+
+CONNECTION_ARGUMENTS = {
+    "spreadsheet": "https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID_HERE",
     "type": "service_account",
     "project_id": "YOUR_PROJECT_ID",
     "private_key_id": "YOUR_PRIVATE_KEY_ID",
-    # Paste your long private key directly inside the triple quotes below
-    "private_key": """-----BEGIN PRIVATE KEY-----
-PASTE_YOUR_LONG_CRYPTO_KEY_STRING_HERE
------END PRIVATE KEY-----""",
+    "private_key": scrubbed_key,
     "client_email": "YOUR_SERVICE_ACCOUNT_EMAIL@PROJECT.iam.gserviceaccount.com",
     "client_id": "YOUR_CLIENT_ID",
     "auth_uri": "https://accounts.google.com/o/oauth2/auth",
@@ -173,33 +175,8 @@ PASTE_YOUR_LONG_CRYPTO_KEY_STRING_HERE
     "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/YOUR_SERVICE_ACCOUNT_EMAIL"
 }
 
-TARGET_SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID_HERE"
-
-# 🛠️ BULLETPROOF KEY SCRUBBER: Sanitizes spaces, indents, and literal string escapes
-if "private_key" in GOOGLE_CREDENTIALS_DATA:
-    key_content = GOOGLE_CREDENTIALS_DATA["private_key"]
-    
-    # Unescape literal string representations of newlines if present
-    key_content = key_content.replace("\\n", "\n")
-    
-    # Strip any leading/trailing indentation added by your text editor on individual lines
-    cleaned_lines = []
-    for line in key_content.splitlines():
-        cleaned_line = line.strip()
-        if cleaned_line:
-            cleaned_lines.append(cleaned_line)
-            
-    # Reassemble key with correct cryptographic Unix line endings
-    GOOGLE_CREDENTIALS_DATA["private_key"] = "\n".join(cleaned_lines)
-
-# Bind values safely into Streamlit's internal credentials architecture
-st.secrets._secrets["connections"]["gsheets"] = {
-    "spreadsheet": TARGET_SPREADSHEET_URL,
-    **GOOGLE_CREDENTIALS_DATA
-}
-
-# Connect using the Streamlit GSheets driver framework
-conn = st.connection("gsheets", type=GSheetsConnection)
+# Connect by passing parameters explicitly directly via connection signature
+conn = st.connection("gsheets", type=GSheetsConnection, **CONNECTION_ARGUMENTS)
 
 # Read master database directly from worksheet Sheet1
 try:
@@ -351,7 +328,7 @@ with tab_survey:
             
             try:
                 conn.update(
-                    spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet"], 
+                    spreadsheet=CONNECTION_ARGUMENTS["spreadsheet"], 
                     worksheet="Sheet1",
                     data=updated_master_df
                 )
