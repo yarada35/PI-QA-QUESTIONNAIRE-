@@ -1,41 +1,43 @@
 import streamlit as st
-import pandas as pd
 import gspread
 import re
-import json
 from google.oauth2 import service_account
 
-# --- PAGE CONFIG ---
+# Page Config
 st.set_page_config(page_title="PIQA Analytics & Survey Hub", layout="wide")
 
-# --- AUTHENTICATION ENGINE ---
+# Styling to keep the professional look active even during errors
+st.markdown("""
+    <style>
+    .stApp { background-color: #05070F !important; color: #F1F5F9 !important; }
+    </style>
+""", unsafe_allow_html=True)
+
 @st.cache_resource(ttl="1h")
 def get_gspread_client():
     gs = st.secrets["connections"]["gsheets"]
     
-    # AGGRESSIVE CLEANUP: 
-    # 1. Convert literal string "\n" to actual newlines
-    # 2. Extract the key material precisely
-    raw_key = str(gs.get("private_key", ""))
+    # BRUTE-FORCE SANITIZATION:
+    # 1. Take the raw string
+    raw = str(gs.get("private_key", ""))
+    # 2. Extract ONLY valid base64 chars (A-Z, a-z, 0-9, +, /)
+    # This specifically removes the '.' character (ASCII 46) causing your error
+    clean_base64 = re.sub(r'[^A-Za-z0-9+/]', '', raw)
     
-    # Handle both real newlines and escaped "\n" sequences
-    clean_key = raw_key.replace('\\n', '\n').strip()
+    # 3. Rebuild the PEM format standard
+    formatted_key = "-----BEGIN PRIVATE KEY-----\n" + "\n".join([clean_base64[i:i+64] for i in range(0, len(clean_base64), 64)]) + "\n-----END PRIVATE KEY-----\n"
     
-    # Ensure the key is wrapped correctly if the header/footer were stripped
-    if "-----BEGIN PRIVATE KEY-----" not in clean_key:
-        clean_key = f"-----BEGIN PRIVATE KEY-----\n{clean_key}\n-----END PRIVATE KEY-----"
-
     credentials_info = {
         "type": gs["type"],
         "project_id": gs["project_id"],
         "private_key_id": gs["private_key_id"],
-        "private_key": clean_key,
         "client_email": gs["client_email"],
         "client_id": gs["client_id"],
         "auth_uri": "https://accounts.google.com/o/oauth2/auth",
         "token_uri": "https://oauth2.googleapis.com/token",
         "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-        "client_x509_cert_url": gs["client_x509_cert_url"]
+        "client_x509_cert_url": gs["client_x509_cert_url"],
+        "private_key": formatted_key
     }
     
     return gspread.authorize(service_account.Credentials.from_service_account_info(
@@ -43,26 +45,14 @@ def get_gspread_client():
         scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     ))
 
-# --- MAIN UI ---
+# Main UI
 def main():
-    st.markdown("<h1>PIQA Live Matrix Portal</h1>", unsafe_allow_html=True)
-    
-    with st.sidebar:
-        st.markdown("## 🎨 Control Room")
-        st.radio("Target Departments Filter", [
-            'All Matrix Mix', 'Plant Engineering Department', 'Production Department', 
-            'Sales and Marketing Department', 'PIQA Employee Staff', 'Purchase Department', 'Store Department'
-        ])
-
-    tab1, tab2, tab3 = st.tabs(["📊 Live Analytics Dashboard", "📝 Interactive Survey Intake", "🖨️ Print Hub"])
-
-    with tab1:
-        try:
-            client = get_gspread_client()
-            st.success("✅ Dashboard connected.")
-        except Exception as e:
-            st.error(f"Authentication Failed: {e}")
-            st.info("Check your 'private_key' formatting in Streamlit Secrets.")
+    st.title("PIQA Live Matrix Portal")
+    try:
+        client = get_gspread_client()
+        st.success("Dashboard Initialized")
+    except Exception as e:
+        st.error(f"Authentication Failed: {e}")
 
 if __name__ == "__main__":
     main()
