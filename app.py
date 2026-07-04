@@ -163,54 +163,52 @@ def get_gspread_client():
         "https://www.googleapis.com/auth/drive"
     ]
     
-    # 1. Gather all basic configuration dictionary definitions
-    target_source = {}
-    if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
-        target_source = copy.deepcopy(dict(st.secrets["connections"]["gsheets"]))
-    else:
-        target_source = copy.deepcopy(dict(st.secrets))
-
-    credentials_info = {}
-    info_keys = ["type", "project_id", "private_key_id", "private_key", "client_email", "client_id", "auth_uri", "token_uri", "auth_provider_x509_cert_url", "client_x509_cert_url"]
-    
-    for k in info_keys:
-        if k in target_source:
-            credentials_info[k] = str(target_source[k])
-
-    # 2. RAW TEXT POOL SANITIZATION
-    # Convert secrets object to a massive monolithic text block to parse out scrambled strings
+    # 1. Monolithically dump all environments into a raw character block
     raw_dump = str(st.secrets)
     if "connections" in st.secrets:
         raw_dump += "\n" + str(st.secrets["connections"])
         if "gsheets" in st.secrets["connections"]:
             raw_dump += "\n" + str(st.secrets["connections"]["gsheets"])
 
-    # Standardize newline escapes entirely
+    # Clean out escaped newline formatting anomalies
     raw_dump = raw_dump.replace("\\n", "\n").replace("\\\\n", "\n")
 
-    # 3. REGEX KEY PAYLOAD ISOLATOR
-    # Forcefully grab the exact cryptographic sequence, bypassing variable leaks (like client_email =)
+    # 2. Strict RegEx Engine for parameter profiling
+    credential_regex_map = {
+        "type": r'(?i)\btype\b\s*[:=]\s*[\'"]?([^\'"\n,]+)',
+        "project_id": r'(?i)\bproject_id\b\s*[:=]\s*[\'"]?([^\'"\n,]+)',
+        "private_key_id": r'(?i)\bprivate_key_id\b\s*[:=]\s*[\'"]?([^\'"\n,]+)',
+        "client_email": r'(?i)\bclient_email\b\s*[:=]\s*[\'"]?([^\'"\n,]+)',
+        "client_id": r'(?i)\bclient_id\b\s*[:=]\s*[\'"]?([^\'"\n,]+)',
+        "auth_uri": r'(?i)\bauth_uri\b\s*[:=]\s*[\'"]?([^\'"\n,]+)',
+        "token_uri": r'(?i)\btoken_uri\b\s*[:=]\s*[\'"]?([^\'"\n,]+)',
+        "auth_provider_x509_cert_url": r'(?i)\bauth_provider_x509_cert_url\b\s*[:=]\s*[\'"]?([^\'"\n,]+)',
+        "client_x509_cert_url": r'(?i)\bclient_x509_cert_url\b\s*[:=]\s*[\'"]?([^\'"\n,]+)'
+    }
+
+    credentials_info = {}
+    for key, pattern in credential_regex_map.items():
+        match = re.search(pattern, raw_dump)
+        if match:
+            credentials_info[key] = match.group(1).strip()
+
+    # 3. REGEX CRYPTO BOUNDARY ISOLATOR
+    # Snips exclusively what falls inside the BEGIN/END wrappers, purging trailing TOML lines
     crypto_match = re.search(r"-----BEGIN PRIVATE KEY-----(.*?)-----END PRIVATE KEY-----", raw_dump, re.DOTALL)
     
     if crypto_match:
         pure_crypto_body = crypto_match.group(1)
         
-        # Strip all formatting artifacts, symbols, quotes, commas, and trailing TOML keys
+        # Strip out all non-Base64 characters (quotes, equal signs, variables names)
         pure_crypto_body = re.sub(r'[^A-Za-z0-9+/=\s]', '', pure_crypto_body)
         
-        # Build individual line structures cleanly
+        # Build individual lines cleanly
         clean_lines = [line.strip() for line in pure_crypto_body.split("\n") if line.strip()]
         
-        # Package directly inside the credential dictionary context
+        # Set structured private key array inside credentials payload
         credentials_info["private_key"] = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(clean_lines) + "\n-----END PRIVATE KEY-----\n"
     else:
-        # Emergency processing fallback
-        if "private_key" in credentials_info:
-            fallback_key = credentials_info["private_key"].replace("\\n", "\n")
-            fallback_key = fallback_key.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "")
-            fallback_key = re.sub(r'[^A-Za-z0-9+/=\s]', '', fallback_key)
-            clean_lines = [line.strip() for line in fallback_key.split("\n") if line.strip()]
-            credentials_info["private_key"] = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(clean_lines) + "\n-----END PRIVATE KEY-----\n"
+        st.error("🚨 Critical Configuration Error: Unable to detect physical '-----BEGIN PRIVATE KEY-----' markers inside Streamlit cloud secrets module.")
 
     creds = service_account.Credentials.from_service_account_info(credentials_info, scopes=scopes)
     return gspread.authorize(creds)
@@ -239,7 +237,7 @@ def update_gsheet_data(spreadsheet_url_or_name, dataframe, worksheet_name="Sheet
     sheet.clear()
     sheet.update([dataframe.columns.values.tolist()] + dataframe.fillna("").values.tolist())
 
-# Detect sheet targets from configuration contexts
+# Detect sheet targets from configuration contexts safely
 spreadsheet_target = ""
 if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
     spreadsheet_target = st.secrets["connections"]["gsheets"].get("spreadsheet", "")
