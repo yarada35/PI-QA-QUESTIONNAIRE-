@@ -4,6 +4,7 @@ import numpy as np
 import plotly.express as px
 from datetime import datetime
 import gspread
+import json
 from google.oauth2 import service_account
 
 # ==========================================
@@ -151,7 +152,7 @@ emoji_options = ["1 🤬", "2 🙁", "3 😐", "4 🙂", "5 🤩"]
 emoji_clean_map = {"1": "🤬", "2": "🙁", "3": "😐", "4": "🙂", "5": "🤩"}
 
 # ==========================================
-# 3. DIRECT RAW GOOGLE CREDENTIALS INJECTION
+# 3. SMART AUTHENTICATION PARSER
 # ==========================================
 @st.cache_resource(ttl="1h")
 def get_gspread_client():
@@ -160,43 +161,49 @@ def get_gspread_client():
         "https://www.googleapis.com/auth/drive"
     ]
     
-    # 1. Resolve secrets dictionary hierarchy dynamically
+    # 1. Gather all configuration properties
     g_secrets = {}
     if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
         g_secrets = dict(st.secrets["connections"]["gsheets"])
     else:
         g_secrets = dict(st.secrets)
 
-    # 2. Extract and rigorously repair the private key envelope layout
+    # 2. Check if the private key field itself contains a complete JSON string wrapper
+    if "private_key" in g_secrets:
+        key_content = str(g_secrets["private_key"]).strip()
+        
+        # If the secret variable is accidentally the complete JSON string token, parse it entirely
+        if key_content.startswith("{") and key_content.endswith("}"):
+            try:
+                g_secrets = json.loads(key_content)
+            except Exception:
+                pass
+
+    # 3. Extract and deeply sanitize the text block target
     if "private_key" in g_secrets:
         raw_key = str(g_secrets["private_key"])
         
-        # Strip literal surrounding quotes if present from string configurations
+        # Remove wrapper quote artifacts if present
         if (raw_key.startswith('"') and raw_key.endswith('"')) or (raw_key.startswith("'") and raw_key.endswith("'")):
             raw_key = raw_key[1:-1]
             
-        # Standardize real newlines (fixes double escaping from configurations)
+        # Repair internal line wraps
         raw_key = raw_key.replace("\\n", "\n")
         
-        # Clean up lines individually and eliminate empty gaps
         lines = [line.strip() for line in raw_key.split("\n") if line.strip()]
-        
-        # Re-assemble only the base64 payload body
         cleaned_body = []
         for line in lines:
             if "BEGIN PRIVATE KEY" in line or "END PRIVATE KEY" in line:
                 continue
             cleaned_body.append(line)
             
-        # Enforce structural envelope to bypass the Cryptography formatting bug
-        final_pem_key = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(cleaned_body) + "\n-----END PRIVATE KEY-----\n"
-        g_secrets["private_key"] = final_pem_key
+        # Rebuild pristine structural PEM layout
+        g_secrets["private_key"] = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(cleaned_body) + "\n-----END PRIVATE KEY-----\n"
 
-    # 3. Gather standard keys needed for JSON payload matching Google service requirements
+    # 4. Filter only keys valid for Google Service Accounts
     info_keys = ["type", "project_id", "private_key_id", "private_key", "client_email", "client_id", "auth_uri", "token_uri", "auth_provider_x509_cert_url", "client_x509_cert_url"]
     credentials_info = {k: g_secrets.get(k) for k in info_keys if k in g_secrets}
 
-    # 4. Generate native credentials object safely
     creds = service_account.Credentials.from_service_account_info(credentials_info, scopes=scopes)
     return gspread.authorize(creds)
 
@@ -224,7 +231,7 @@ def update_gsheet_data(spreadsheet_url_or_name, dataframe, worksheet_name="Sheet
     sheet.clear()
     sheet.update([dataframe.columns.values.tolist()] + dataframe.fillna("").values.tolist())
 
-# Fetch spreadsheet targets cleanly
+# Locate targets cleanly
 spreadsheet_target = ""
 if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
     spreadsheet_target = st.secrets["connections"]["gsheets"].get("spreadsheet", "")
@@ -233,7 +240,7 @@ if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
 else:
     spreadsheet_target = st.secrets.get("spreadsheet", st.secrets.get("url", ""))
 
-# Load operational dataframe from data store engine
+# Load database framework
 df = read_gsheet_data(spreadsheet_target, "Sheet1")
 if not df.empty and 'Score' in df.columns:
     df['Score'] = pd.to_numeric(df['Score'], errors='coerce')
@@ -272,7 +279,7 @@ with st.sidebar:
     st.markdown("<hr style='border-color: #1E293B;'/>", unsafe_allow_html=True)
     st.button("🔄 Clear App Filters", on_click=clear_global_filters, use_container_width=True)
 
-# Filter Processing Engine Slices
+# Filter Processing Slices
 filtered_df = df.dropna(subset=['Score']).copy() if not df.empty else df.copy()
 if selected_dept != 'All Matrix Mix':
     filtered_df = filtered_df[filtered_df['Department'] == selected_dept]
