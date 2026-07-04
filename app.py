@@ -150,19 +150,43 @@ emoji_options = ["1 🤬", "2 🙁", "3 😐", "4 🙂", "5 🤩"]
 emoji_clean_map = {"1": "🤬", "2": "🙁", "3": "😐", "4": "🙂", "5": "🤩"}
 
 # ==========================================
-# 3. DRIVER INITIALIZATION WITH KEY SCRUBBER
+# 3. ADVANCED CRYPTOGRAPHIC REPAIR & INITIALIZATION
 # ==========================================
-# Automatically processes raw string anomalies (\n escapes) before initialization
 try:
     if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
-        raw_key = st.secrets["connections"]["gsheets"].get("private_key", "")
-        if "\\n" in raw_key:
-            scrubbed_key = raw_key.replace("\\n", "\n")
-            st.secrets["connections"]["gsheets"]["private_key"] = scrubbed_key
-except Exception:
-    pass
+        # Extract secret configuration parameters safely
+        g_secrets = st.secrets["connections"]["gsheets"]
+        if "private_key" in g_secrets:
+            key_str = g_secrets["private_key"]
+            
+            # 1. Strip external string layout literal wrapping quotes if present
+            if (key_str.startswith('"') and key_str.endswith('"')) or (key_str.startswith("'") and key_str.endswith("'")):
+                key_str = key_str[1:-1]
+            
+            # 2. Convert explicit '\\n' tracking combinations into actual newlines
+            key_str = key_str.replace("\\n", "\n")
+            
+            # 3. Clean up formatting whitespace patterns
+            lines = [line.strip() for line in key_str.split("\n") if line.strip()]
+            
+            # 4. Construct structural PEM layout block explicitly
+            cleaned_lines = []
+            for line in lines:
+                if "BEGIN PRIVATE KEY" in line:
+                    cleaned_lines.append("-----BEGIN PRIVATE KEY-----")
+                elif "END PRIVATE KEY" in line:
+                    cleaned_lines.append("-----END PRIVATE KEY-----")
+                else:
+                    cleaned_lines.append(line)
+            
+            final_pem_key = "\n".join(cleaned_lines)
+            
+            # Re-inject the pristine key back into Streamlit's environment memory
+            st.secrets["connections"]["gsheets"]["private_key"] = final_pem_key
+except Exception as e:
+    st.sidebar.error(f"Sanitization Warning: {e}")
 
-# ✅ Streamlit pulls credentials directly from the verified secrets structure
+# Initialize GSheets Driver Connection instance safely
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # Read master database directly from worksheet Sheet1
