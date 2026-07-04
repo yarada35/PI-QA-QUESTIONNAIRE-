@@ -2,27 +2,30 @@ import streamlit as st
 import gspread
 from google.oauth2 import service_account
 
+# PAGE CONFIG
+st.set_page_config(page_title="PIQA Live Matrix Portal", layout="wide")
+
 @st.cache_resource(ttl="1h")
 def get_gspread_client():
-    # Load all secrets as a dictionary
-    gs = st.secrets["connections"]["gsheets"]
+    # Attempt to load the secrets directly
+    # If using Streamlit Secrets, just access st.secrets directly
+    creds_dict = dict(st.secrets["connections"]["gsheets"])
     
-    # Create the credentials dictionary directly from the secrets
-    # This assumes your secrets.toml contains all fields from the original JSON
     creds = service_account.Credentials.from_service_account_info(
-        dict(gs), 
+        creds_dict, 
         scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     )
     return gspread.authorize(creds)
 
 def main():
     st.markdown("<h1>PIQA Live Matrix Portal</h1>", unsafe_allow_html=True)
+    
     try:
-        get_gspread_client()
+        client = get_gspread_client()
         st.success("✅ Dashboard Connected")
     except Exception as e:
         st.error("Authentication Error")
-        st.write("Please ensure your 'secrets.toml' contains the raw, full JSON data.")
+        st.write(f"Error Details: {e}")
 
 if __name__ == "__main__":
     main()
