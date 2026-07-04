@@ -152,10 +152,14 @@ emoji_clean_map = {"1": "🤬", "2": "🙁", "3": "😐", "4": "🙂", "5": "�
 # ==========================================
 # 3. ADVANCED CRYPTOGRAPHIC REPAIR & INITIALIZATION
 # ==========================================
+# Create a mutable Python dict copy of the secrets context to strip read-only blocks safely
+connection_kwargs = {}
+
 try:
     if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
-        # Extract secret configuration parameters safely
-        g_secrets = st.secrets["connections"]["gsheets"]
+        # Cast the read-only configuration context into a normal editable dict
+        g_secrets = dict(st.secrets["connections"]["gsheets"])
+        
         if "private_key" in g_secrets:
             key_str = g_secrets["private_key"]
             
@@ -181,13 +185,19 @@ try:
             
             final_pem_key = "\n".join(cleaned_lines)
             
-            # Re-inject the pristine key back into Streamlit's environment memory
-            st.secrets["connections"]["gsheets"]["private_key"] = final_pem_key
+            # Assign the verified cleaned key to our mutable payload dictionary
+            g_secrets["private_key"] = final_pem_key
+            
+        # Collect all parameters to override the default connection defaults
+        connection_kwargs = g_secrets
 except Exception as e:
-    st.sidebar.error(f"Sanitization Warning: {e}")
+    st.sidebar.error(f"Configuration Adjustment Trace: {e}")
 
-# Initialize GSheets Driver Connection instance safely
-conn = st.connection("gsheets", type=GSheetsConnection)
+# Initialize GSheets Driver Connection instance with our verified dictionary payload override
+if connection_kwargs:
+    conn = st.connection("gsheets", type=GSheetsConnection, **connection_kwargs)
+else:
+    conn = st.connection("gsheets", type=GSheetsConnection)
 
 # Read master database directly from worksheet Sheet1
 try:
