@@ -152,7 +152,7 @@ emoji_options = ["1 🤬", "2 🙁", "3 😐", "4 🙂", "5 🤩"]
 emoji_clean_map = {"1": "🤬", "2": "🙁", "3": "😐", "4": "🙂", "5": "🤩"}
 
 # ==========================================
-# 3. SMART AUTHENTICATION PARSER
+# 3. ABSOLUTE CRASH-PROOF AUTHENTICATION ENGINE
 # ==========================================
 @st.cache_resource(ttl="1h")
 def get_gspread_client():
@@ -161,48 +161,52 @@ def get_gspread_client():
         "https://www.googleapis.com/auth/drive"
     ]
     
-    # 1. Gather all configuration properties
+    # Extract source map dictionary context safely
     g_secrets = {}
     if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
         g_secrets = dict(st.secrets["connections"]["gsheets"])
     else:
         g_secrets = dict(st.secrets)
 
-    # 2. Check if the private key field itself contains a complete JSON string wrapper
-    if "private_key" in g_secrets:
-        key_content = str(g_secrets["private_key"]).strip()
+    # Process and clean the credentials schema explicitly
+    credentials_info = {}
+    info_keys = ["type", "project_id", "private_key_id", "private_key", "client_email", "client_id", "auth_uri", "token_uri", "auth_provider_x509_cert_url", "client_x509_cert_url"]
+    
+    for k in info_keys:
+        if k in g_secrets:
+            credentials_info[k] = g_secrets[k]
+
+    # Clean the private key structure strictly
+    if "private_key" in credentials_info:
+        raw_key = str(credentials_info["private_key"]).strip()
         
-        # If the secret variable is accidentally the complete JSON string token, parse it entirely
-        if key_content.startswith("{") and key_content.endswith("}"):
+        # If the secret is accidentally the raw JSON text body, unpack it
+        if raw_key.startswith("{") and raw_key.endswith("}"):
             try:
-                g_secrets = json.loads(key_content)
+                parsed_json = json.loads(raw_key)
+                for k in info_keys:
+                    if k in parsed_json:
+                        credentials_info[k] = parsed_json[k]
+                raw_key = str(credentials_info.get("private_key", "")).strip()
             except Exception:
                 pass
 
-    # 3. Extract and deeply sanitize the text block target
-    if "private_key" in g_secrets:
-        raw_key = str(g_secrets["private_key"])
-        
-        # Remove wrapper quote artifacts if present
+        # Strip enclosing string quote anomalies
         if (raw_key.startswith('"') and raw_key.endswith('"')) or (raw_key.startswith("'") and raw_key.endswith("'")):
             raw_key = raw_key[1:-1]
             
-        # Repair internal line wraps
+        # Standardize modern newline characters
         raw_key = raw_key.replace("\\n", "\n")
         
+        # Re-envelope data body strictly to ensure no syntax issues at index 5
         lines = [line.strip() for line in raw_key.split("\n") if line.strip()]
-        cleaned_body = []
+        cleaned_lines = []
         for line in lines:
             if "BEGIN PRIVATE KEY" in line or "END PRIVATE KEY" in line:
                 continue
-            cleaned_body.append(line)
+            cleaned_lines.append(line)
             
-        # Rebuild pristine structural PEM layout
-        g_secrets["private_key"] = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(cleaned_body) + "\n-----END PRIVATE KEY-----\n"
-
-    # 4. Filter only keys valid for Google Service Accounts
-    info_keys = ["type", "project_id", "private_key_id", "private_key", "client_email", "client_id", "auth_uri", "token_uri", "auth_provider_x509_cert_url", "client_x509_cert_url"]
-    credentials_info = {k: g_secrets.get(k) for k in info_keys if k in g_secrets}
+        credentials_info["private_key"] = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(cleaned_lines) + "\n-----END PRIVATE KEY-----\n"
 
     creds = service_account.Credentials.from_service_account_info(credentials_info, scopes=scopes)
     return gspread.authorize(creds)
@@ -240,7 +244,7 @@ if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
 else:
     spreadsheet_target = st.secrets.get("spreadsheet", st.secrets.get("url", ""))
 
-# Load database framework
+# Load dataset framework
 df = read_gsheet_data(spreadsheet_target, "Sheet1")
 if not df.empty and 'Score' in df.columns:
     df['Score'] = pd.to_numeric(df['Score'], errors='coerce')
