@@ -1,50 +1,39 @@
 import streamlit as st
-import gspread
-from google.oauth2 import service_account
 
 # PAGE CONFIGURATION
 st.set_page_config(page_title="PIQA Live Matrix Portal", layout="wide")
 
-# AUTHENTICATION ENGINE
-@st.cache_resource(ttl="1h")
-def get_gspread_client():
-    """
-    Loads credentials from a flat secret structure.
-    This bypasses nested dictionaries that cause handshake failures.
-    """
-    # Load all secrets as a flat dictionary
-    creds_dict = st.secrets
-    
-    # Initialize credentials directly
-    creds = service_account.Credentials.from_service_account_info(
-        creds_dict,
-        scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    )
-    return gspread.authorize(creds)
+# INITIALIZE MEMORY
+# This creates a local list to store feedback during the session
+if "feedback_log" not in st.session_state:
+    st.session_state.feedback_log = []
 
-# MAIN INTERFACE
 def main():
     st.markdown("<h1>PIQA Live Matrix Portal</h1>", unsafe_allow_html=True)
-    
-    # Separate connection attempt from UI rendering to prevent blank screens
-    try:
-        client = get_gspread_client()
-        st.success("✅ Dashboard Connected Successfully")
-    except Exception as e:
-        st.error("Authentication Error: Configuration handshake failed.")
-        st.info("Ensure your Secrets panel contains the flat, full JSON structure.")
-        with st.expander("See Diagnostic Logs"):
-            st.code(str(e))
+    st.write("Unified suite for live operational analysis and internal feedback.")
 
-    # Dashboard Layout
-    tab1, tab2, tab3 = st.tabs(["📊 Live Analytics Dashboard", "📝 Interactive Survey Intake", "🖨️ Print Hub"])
-    
+    tab1, tab2 = st.tabs(["📊 Analytics Dashboard", "📝 Interactive Feedback Intake"])
+
     with tab1:
-        st.subheader("Operational Overview")
-        st.write("Metrics visualizers will populate once database hooks validate successfully.")
+        st.subheader("Live Operational Overview")
+        if not st.session_state.feedback_log:
+            st.info("No feedback submitted in this session yet.")
+        else:
+            st.write("### Captured Feedback Entries:")
+            for idx, entry in enumerate(st.session_state.feedback_log, 1):
+                st.markdown(f"**{idx}.** {entry}")
+
     with tab2:
-        st.subheader("Data Intake Form")
-        st.write("Department survey forms operational environment.")
+        st.subheader("Submit Feedback")
+        with st.form("feedback_form", clear_on_submit=True):
+            user_input = st.text_area("Enter your feedback here:")
+            submitted = st.form_submit_button("Submit Feedback")
+            
+            if submitted and user_input:
+                st.session_state.feedback_log.append(user_input)
+                st.success("Feedback captured locally!")
+            elif submitted and not user_input:
+                st.warning("Please enter some text before submitting.")
 
 if __name__ == "__main__":
     main()
