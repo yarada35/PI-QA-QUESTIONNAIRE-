@@ -1,28 +1,25 @@
 import streamlit as st
 import gspread
-import base64
+import re
 from google.oauth2 import service_account
+
+# PAGE CONFIG
+st.set_page_config(page_title="PIQA Analytics & Survey Hub", layout="wide")
 
 @st.cache_resource(ttl="1h")
 def get_gspread_client():
     gs = st.secrets["connections"]["gsheets"]
     
-    # 1. Extract and clean the key string
+    # 1. Extract raw key
     raw_key = str(gs.get("private_key", ""))
-    # Remove header, footer, and all newlines
-    clean_base64 = raw_key.replace("-----BEGIN PRIVATE KEY-----", "") \
-                          .replace("-----END PRIVATE KEY-----", "") \
-                          .replace("\n", "").replace("\r", "").strip()
     
-    # 2. Force correct padding (Base64 must be a multiple of 4)
-    missing_padding = len(clean_base64) % 4
-    if missing_padding:
-        clean_base64 += '=' * (4 - missing_padding)
+    # 2. AGGRESSIVE CLEANUP: 
+    # This regex removes EVERYTHING except A-Z, a-z, 0-9, +, /, and =
+    clean_base64 = re.sub(r'[^A-Za-z0-9+/=]', '', raw_key)
     
-    # 3. Reconstruct into a strictly formatted PEM block
-    formatted_key = "-----BEGIN PRIVATE KEY-----\n" + \
-                    "\n".join([clean_base64[i:i+64] for i in range(0, len(clean_base64), 64)]) + \
-                    "\n-----END PRIVATE KEY-----\n"
+    # 3. Reconstruct into standard 64-char lines to satisfy PEM requirements
+    chunks = [clean_base64[i:i+64] for i in range(0, len(clean_base64), 64)]
+    formatted_key = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(chunks) + "\n-----END PRIVATE KEY-----\n"
     
     credentials_info = {
         "type": gs["type"],
@@ -42,16 +39,14 @@ def get_gspread_client():
         scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     ))
 
-# --- APP UI ---
 def main():
-    st.set_page_config(layout="wide")
     st.markdown("<h1>PIQA Live Matrix Portal</h1>", unsafe_allow_html=True)
-    
     try:
         client = get_gspread_client()
-        st.success("✅ Dashboard successfully authenticated.")
+        st.success("✅ Dashboard connected.")
     except Exception as e:
         st.error(f"Authentication Failed: {e}")
+        st.info("The system is still detecting invalid characters in your 'private_key'.")
 
 if __name__ == "__main__":
     main()
