@@ -163,7 +163,7 @@ def get_gspread_client():
         "https://www.googleapis.com/auth/drive"
     ]
     
-    # 1. Gather all secrets using a safe deep copy to isolate reference structures
+    # 1. Rebuild basic standard key mappings safely
     target_source = {}
     if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
         target_source = copy.deepcopy(dict(st.secrets["connections"]["gsheets"]))
@@ -177,30 +177,40 @@ def get_gspread_client():
         if k in target_source:
             credentials_info[k] = str(target_source[k])
 
-    # 2. Hardened PEM Extraction Core (Bypasses InvalidByte errors completely)
-    if "private_key" in credentials_info:
-        raw_key = credentials_info["private_key"]
+    # 2. GLOBAL STRING BACKUP EXTRACTOR
+    # If Streamlit completely garbled the fields, convert the entire secrets ecosystem to a text block
+    raw_dump = str(st.secrets)
+    if "connections" in st.secrets:
+        raw_dump += "\n" + str(st.secrets["connections"])
+        if "gsheets" in st.secrets["connections"]:
+            raw_dump += "\n" + str(st.secrets["connections"]["gsheets"])
+
+    # Clean character artifacts out of the raw dump text block
+    raw_dump = raw_dump.replace("\\n", "\n").replace("\\\\n", "\n")
+
+    # 3. REGEX CRYPTO ISOLATOR
+    # Forcefully grab everything between the true PEM wrappers, ignoring text labels completely
+    crypto_match = re.search(r"-----BEGIN PRIVATE KEY-----(.*?)-----END PRIVATE KEY-----", raw_dump, re.DOTALL)
+    
+    if crypto_match:
+        pure_crypto_body = crypto_match.group(1)
         
-        # Normalize newline escaping safely
-        raw_key = raw_key.replace("\\n", "\n")
+        # Drop anything that isn't a true Base64 structural layout item
+        pure_crypto_body = re.sub(r'[^A-Za-z0-9+/=\s]', '', pure_crypto_body)
         
-        # Strip structural headers/footers if they are explicitly present
-        raw_key = raw_key.replace("-----BEGIN PRIVATE KEY-----", "")
-        raw_key = raw_key.replace("-----END PRIVATE KEY-----", "")
+        # Build individual line frames cleanly
+        clean_lines = [line.strip() for line in pure_crypto_body.split("\n") if line.strip()]
         
-        # Remove variable assignment leftovers (e.g., 'private_key = ', '"private_key":')
-        if "private_key" in raw_key:
-            raw_key = re.sub(r'(?i)^.*?\bprivate_key\b\s*[:=]\s*', '', raw_key)
-            
-        # THE FIX: Strip away EVERYTHING that isn't valid Base64 payload data or newlines.
-        # This explicitly purges accidental decimals, version numbers (like '5.0'), and TOML artifacts.
-        raw_key = re.sub(r'[^A-Za-z0-9+/=\s]', '', raw_key)
-        
-        # Segment into clear standardized blocks
-        key_lines = [line.strip() for line in raw_key.split("\n") if line.strip()]
-        
-        # Re-envelope into standard cryptographic PEM layout
-        credentials_info["private_key"] = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(key_lines) + "\n-----END PRIVATE KEY-----\n"
+        # Package into the final dictionary securely
+        credentials_info["private_key"] = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(clean_lines) + "\n-----END PRIVATE KEY-----\n"
+    else:
+        # Fallback to standard property parsing if regex can't find clear tags
+        if "private_key" in credentials_info:
+            fallback_key = credentials_info["private_key"].replace("\\n", "\n")
+            fallback_key = fallback_key.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "")
+            fallback_key = re.sub(r'[^A-Za-z0-9+/=\s]', '', fallback_key)
+            clean_lines = [line.strip() for line in fallback_key.split("\n") if line.strip()]
+            credentials_info["private_key"] = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(clean_lines) + "\n-----END PRIVATE KEY-----\n"
 
     creds = service_account.Credentials.from_service_account_info(credentials_info, scopes=scopes)
     return gspread.authorize(creds)
