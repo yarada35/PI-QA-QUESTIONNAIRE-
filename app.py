@@ -170,45 +170,57 @@ def get_gspread_client():
         if "gsheets" in st.secrets["connections"]:
             raw_dump += "\n" + str(st.secrets["connections"]["gsheets"])
 
-    # Clean out escaped newline formatting anomalies
+    # Clean out escaped newline formatting anomalies completely
     raw_dump = raw_dump.replace("\\n", "\n").replace("\\\\n", "\n")
 
-    # 2. Strict RegEx Engine for parameter profiling
+    # 2. Hyper-Aggressive RegEx Engine for parameter profiling
     credential_regex_map = {
-        "type": r'(?i)\btype\b\s*[:=]\s*[\'"]?([^\'"\n,]+)',
-        "project_id": r'(?i)\bproject_id\b\s*[:=]\s*[\'"]?([^\'"\n,]+)',
-        "private_key_id": r'(?i)\bprivate_key_id\b\s*[:=]\s*[\'"]?([^\'"\n,]+)',
-        "client_email": r'(?i)\bclient_email\b\s*[:=]\s*[\'"]?([^\'"\n,]+)',
-        "client_id": r'(?i)\bclient_id\b\s*[:=]\s*[\'"]?([^\'"\n,]+)',
-        "auth_uri": r'(?i)\bauth_uri\b\s*[:=]\s*[\'"]?([^\'"\n,]+)',
-        "token_uri": r'(?i)\btoken_uri\b\s*[:=]\s*[\'"]?([^\'"\n,]+)',
-        "auth_provider_x509_cert_url": r'(?i)\bauth_provider_x509_cert_url\b\s*[:=]\s*[\'"]?([^\'"\n,]+)',
-        "client_x509_cert_url": r'(?i)\bclient_x509_cert_url\b\s*[:=]\s*[\'"]?([^\'"\n,]+)'
+        "type": r'type\s*[:=]\s*[\'"]?([^\'"\n,}\s]+)',
+        "project_id": r'project_id\s*[:=]\s*[\'"]?([^\'"\n,}\s]+)',
+        "private_key_id": r'private_key_id\s*[:=]\s*[\'"]?([^\'"\n,}\s]+)',
+        "client_email": r'client_email\s*[:=]\s*[\'"]?([^\'"\n,}\s]+)',
+        "client_id": r'client_id\s*[:=]\s*[\'"]?([^\'"\n,}\s]+)',
+        "auth_uri": r'auth_uri\s*[:=]\s*[\'"]?([^\'"\n,}\s]+)',
+        "token_uri": r'token_uri\s*[:=]\s*[\'"]?([^\'"\n,}\s]+)',
+        "auth_provider_x509_cert_url": r'auth_provider_x509_cert_url\s*[:=]\s*[\'"]?([^\'"\n,}\s]+)',
+        "client_x509_cert_url": r'client_x509_cert_url\s*[:=]\s*[\'"]?([^\'"\n,}\s]+)'
     }
 
     credentials_info = {}
     for key, pattern in credential_regex_map.items():
-        match = re.search(pattern, raw_dump)
+        match = re.search(pattern, raw_dump, re.IGNORECASE)
         if match:
             credentials_info[key] = match.group(1).strip()
 
     # 3. REGEX CRYPTO BOUNDARY ISOLATOR
-    # Snips exclusively what falls inside the BEGIN/END wrappers, purging trailing TOML lines
     crypto_match = re.search(r"-----BEGIN PRIVATE KEY-----(.*?)-----END PRIVATE KEY-----", raw_dump, re.DOTALL)
     
     if crypto_match:
         pure_crypto_body = crypto_match.group(1)
-        
-        # Strip out all non-Base64 characters (quotes, equal signs, variables names)
         pure_crypto_body = re.sub(r'[^A-Za-z0-9+/=\s]', '', pure_crypto_body)
-        
-        # Build individual lines cleanly
         clean_lines = [line.strip() for line in pure_crypto_body.split("\n") if line.strip()]
-        
-        # Set structured private key array inside credentials payload
         credentials_info["private_key"] = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(clean_lines) + "\n-----END PRIVATE KEY-----\n"
     else:
-        st.error("🚨 Critical Configuration Error: Unable to detect physical '-----BEGIN PRIVATE KEY-----' markers inside Streamlit cloud secrets module.")
+        fallback_key_match = re.search(r'private_key\s*[:=]\s*[\'"]?([^\'"}]+)', raw_dump, re.IGNORECASE)
+        if fallback_key_match:
+            raw_pk = fallback_key_match.group(1)
+            raw_pk = raw_pk.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "")
+            raw_pk = re.sub(r'[^A-Za-z0-9+/=\s]', '', raw_pk)
+            clean_lines = [line.strip() for line in raw_pk.split("\n") if line.strip()]
+            credentials_info["private_key"] = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(clean_lines) + "\n-----END PRIVATE KEY-----\n"
+
+    # Auto-fill global endpoint defaults if structural parsing missed them
+    if "token_uri" not in credentials_info:
+        credentials_info["token_uri"] = "https://oauth2.googleapis.com/token"
+    if "auth_uri" not in credentials_info:
+        credentials_info["auth_uri"] = "https://accounts.google.com/o/oauth2/auth"
+    if "auth_provider_x509_cert_url" not in credentials_info:
+        credentials_info["auth_provider_x509_cert_url"] = "https://www.googleapis.com/oauth2/v1/certs"
+
+    required_fields = ["type", "project_id", "client_email", "private_key"]
+    missing = [f for f in required_fields if f not in credentials_info]
+    if missing:
+        st.error(f"🚨 Missing Key Fields from Secrets Stream: {missing}. Detected keys: {list(credentials_info.keys())}")
 
     creds = service_account.Credentials.from_service_account_info(credentials_info, scopes=scopes)
     return gspread.authorize(creds)
