@@ -6,7 +6,7 @@ import json
 from google.oauth2 import service_account
 
 # ==========================================
-# 1. PAGE SETUP & PREMIUM UI STYLING
+# 1. PAGE SETUP & STYLING
 # ==========================================
 st.set_page_config(page_title="PIQA Analytics & Survey Hub", layout="wide")
 
@@ -23,11 +23,10 @@ st.markdown("""
 # ==========================================
 @st.cache_resource(ttl="1h")
 def get_gspread_client():
-    # Fetch from standard Streamlit connections block
+    # Fetch credentials from Streamlit secrets
     gs = st.secrets["connections"]["gsheets"]
     
-    # CRITICAL FIX: Sanitize the private key to fix InvalidByte(120, 61)
-    # This removes all non-base64 characters and metadata "noise"
+    # Sanitization logic: removes non-base64 characters to fix InvalidByte errors
     raw_key = str(gs.get("private_key", ""))
     clean_base64 = re.sub(r'[^A-Za-z0-9+/=]', '', raw_key)
     
@@ -35,7 +34,6 @@ def get_gspread_client():
     chunks = [clean_base64[i:i+64] for i in range(0, len(clean_base64), 64)]
     formatted_key = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(chunks) + "\n-----END PRIVATE KEY-----\n"
     
-    # Construct credentials dictionary
     credentials_info = {
         "type": gs["type"],
         "project_id": gs["project_id"],
@@ -75,8 +73,7 @@ def main():
     with tab1:
         try:
             client = get_gspread_client()
-            st.success("✅ Authentication successful: Live Matrix Portal connected.")
-            # Add your data fetching/display logic here
+            st.success("✅ Connected to Matrix Portal.")
         except Exception as e:
             st.error(f"Initialization Error: {e}")
 
