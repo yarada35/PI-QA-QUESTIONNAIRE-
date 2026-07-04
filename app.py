@@ -150,7 +150,7 @@ emoji_options = ["1 🤬", "2 🙁", "3 😐", "4 🙂", "5 🤩"]
 emoji_clean_map = {"1": "🤬", "2": "🙁", "3": "😐", "4": "🙂", "5": "🤩"}
 
 # ==========================================
-# 3. COMPATIBLE DICTIONARY INJECTION (FIXES TYPEERROR)
+# 3. DIRECT MANIFEST CONTEXT INJECTION
 # ==========================================
 # 🚨 Replace placeholders below with your genuine Google credentials.
 # 🚨 Ensure the private key text blocks have no leading indent spaces.
@@ -161,23 +161,27 @@ PASTE_YOUR_LONG_CRYPTO_KEY_STRING_HERE
 scrubbed_key = "\n".join([line.strip() for line in RAW_PRIVATE_KEY.splitlines() if line.strip()])
 TARGET_SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID_HERE"
 
-# Creating a secure structured context configuration dictionary matching driver specs
-SECRETS_CONFIG = {
-    "spreadsheet": TARGET_SPREADSHEET_URL,
-    "type": "service_account",
-    "project_id": "YOUR_PROJECT_ID",
-    "private_key_id": "YOUR_PRIVATE_KEY_ID",
-    "private_key": scrubbed_key,
-    "client_email": "YOUR_SERVICE_ACCOUNT_EMAIL@PROJECT.iam.gserviceaccount.com",
-    "client_id": "YOUR_CLIENT_ID",
-    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-    "token_uri": "https://oauth2.googleapis.com/token",
-    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-    "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/YOUR_SERVICE_ACCOUNT_EMAIL"
-}
+# Inject into standard Streamlit session secrets dictionary programmatically before initialization
+st.secrets.modify({
+    "connections": {
+        "gsheets": {
+            "spreadsheet": TARGET_SPREADSHEET_URL,
+            "type": "service_account",
+            "project_id": "YOUR_PROJECT_ID",
+            "private_key_id": "YOUR_PRIVATE_KEY_ID",
+            "private_key": scrubbed_key,
+            "client_email": "YOUR_SERVICE_ACCOUNT_EMAIL@PROJECT.iam.gserviceaccount.com",
+            "client_id": "YOUR_CLIENT_ID",
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+            "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/YOUR_SERVICE_ACCOUNT_EMAIL"
+        }
+    }
+})
 
-# Fixes TypeError: Passing config via the explicitly accepted 'secrets' named parameter
-conn = st.connection("gsheets", type=GSheetsConnection, secrets=SECRETS_CONFIG)
+# Revert to clean architecture without throwing a TypeError
+conn = st.connection("gsheets", type=GSheetsConnection)
 
 # Read master database directly from worksheet Sheet1
 try:
@@ -329,7 +333,7 @@ with tab_survey:
             
             try:
                 conn.update(
-                    spreadsheet=SECRETS_CONFIG["spreadsheet"], 
+                    spreadsheet=TARGET_SPREADSHEET_URL, 
                     worksheet="Sheet1",
                     data=updated_master_df
                 )
