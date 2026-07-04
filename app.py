@@ -150,19 +150,20 @@ emoji_options = ["1 🤬", "2 🙁", "3 😐", "4 🙂", "5 🤩"]
 emoji_clean_map = {"1": "🤬", "2": "🙁", "3": "😐", "4": "🙂", "5": "🤩"}
 
 # ==========================================
-# 3. DIRECT CONNECTION INJECTION (NO ST.SECRETS HACK)
+# 3. COMPATIBLE DICTIONARY INJECTION (FIXES TYPEERROR)
 # ==========================================
-# 🚨 Replace these strings with your actual downloaded credentials data.
-# 🚨 Ensure the private key does not contain any indent spaces at the start of lines.
+# 🚨 Replace placeholders below with your genuine Google credentials.
+# 🚨 Ensure the private key text blocks have no leading indent spaces.
 RAW_PRIVATE_KEY = """-----BEGIN PRIVATE KEY-----
 PASTE_YOUR_LONG_CRYPTO_KEY_STRING_HERE
 -----END PRIVATE KEY-----"""
 
-# Advanced raw data scrubber to isolate pure cryptographic structural text
 scrubbed_key = "\n".join([line.strip() for line in RAW_PRIVATE_KEY.splitlines() if line.strip()])
+TARGET_SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID_HERE"
 
-CONNECTION_ARGUMENTS = {
-    "spreadsheet": "https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID_HERE",
+# Creating a secure structured context configuration dictionary matching driver specs
+SECRETS_CONFIG = {
+    "spreadsheet": TARGET_SPREADSHEET_URL,
     "type": "service_account",
     "project_id": "YOUR_PROJECT_ID",
     "private_key_id": "YOUR_PRIVATE_KEY_ID",
@@ -175,8 +176,8 @@ CONNECTION_ARGUMENTS = {
     "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/YOUR_SERVICE_ACCOUNT_EMAIL"
 }
 
-# Connect by passing parameters explicitly directly via connection signature
-conn = st.connection("gsheets", type=GSheetsConnection, **CONNECTION_ARGUMENTS)
+# Fixes TypeError: Passing config via the explicitly accepted 'secrets' named parameter
+conn = st.connection("gsheets", type=GSheetsConnection, secrets=SECRETS_CONFIG)
 
 # Read master database directly from worksheet Sheet1
 try:
@@ -328,7 +329,7 @@ with tab_survey:
             
             try:
                 conn.update(
-                    spreadsheet=CONNECTION_ARGUMENTS["spreadsheet"], 
+                    spreadsheet=SECRETS_CONFIG["spreadsheet"], 
                     worksheet="Sheet1",
                     data=updated_master_df
                 )
