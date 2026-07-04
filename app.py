@@ -5,6 +5,7 @@ import plotly.express as px
 from datetime import datetime
 import gspread
 import json
+import re
 from google.oauth2 import service_account
 
 # ==========================================
@@ -161,58 +162,46 @@ def get_gspread_client():
         "https://www.googleapis.com/auth/drive"
     ]
     
-    # Extract source map dictionary context safely
-    g_secrets = {}
+    # 1. Pull out standard environment properties completely separated from secrets references
+    target_source = {}
     if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
-        g_secrets = dict(st.secrets["connections"]["gsheets"])
+        target_source = dict(st.secrets["connections"]["gsheets"])
     else:
-        g_secrets = dict(st.secrets)
+        target_source = dict(st.secrets)
 
     credentials_info = {}
     info_keys = ["type", "project_id", "private_key_id", "private_key", "client_email", "client_id", "auth_uri", "token_uri", "auth_provider_x509_cert_url", "client_x509_cert_url"]
     
     for k in info_keys:
-        if k in g_secrets:
-            credentials_info[k] = g_secrets[k]
+        if k in target_source:
+            credentials_info[k] = str(target_source[k])
 
-    # Clean the private key structure strictly
+    # 2. Strict execution to isolate the true raw block data and bypass the Byte(5,95) error
     if "private_key" in credentials_info:
-        raw_key = str(credentials_info["private_key"]).strip()
+        raw_key = credentials_info["private_key"].strip()
         
-        # Unpack raw JSON text wrapper if completely passed as one block
-        if raw_key.startswith("{") and raw_key.endswith("}"):
-            try:
-                parsed_json = json.loads(raw_key)
-                for k in info_keys:
-                    if k in parsed_json:
-                        credentials_info[k] = parsed_json[k]
-                raw_key = str(credentials_info.get("private_key", "")).strip()
-            except Exception:
-                pass
+        # Look for a clean Base64 chunk using a regex capture filter
+        crypto_payload = re.search(r"-----BEGIN PRIVATE KEY-----(.*)-----END PRIVATE KEY-----", raw_key, re.DOTALL)
+        if crypto_payload:
+            raw_key = crypto_payload.group(1).strip()
+        else:
+            # If standard wrappers are missing, clean up structural assignment words completely
+            if "private_key" in raw_key:
+                raw_key = re.sub(r"^.*?private_key\s*[=:]\s*", "", raw_key).strip()
+            
+            # Wipe out internal wrapper blocks manually if needed
+            raw_key = raw_key.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "").strip()
 
-        # FIX FOR INVALID BYTE (5, 95): Strip out literal variable prefixes inside the value string
-        if raw_key.startswith("private_key"):
-            if "=" in raw_key:
-                raw_key = raw_key.split("=", 1)[1].strip()
-            elif ":" in raw_key:
-                raw_key = raw_key.split(":", 1)[1].strip()
-
-        # Strip enclosing string quote anomalies
+        # Clean enclosing quote anomalies out
         if (raw_key.startswith('"') and raw_key.endswith('"')) or (raw_key.startswith("'") and raw_key.endswith("'")):
             raw_key = raw_key[1:-1]
-            
-        # Standardize modern newline characters
+
+        # Fix structural newline assignments cleanly
         raw_key = raw_key.replace("\\n", "\n")
         
-        # Isolate base64 data and drop corrupt headers
-        lines = [line.strip() for line in raw_key.split("\n") if line.strip()]
-        cleaned_lines = []
-        for line in lines:
-            if "BEGIN PRIVATE KEY" in line or "END PRIVATE KEY" in line:
-                continue
-            cleaned_lines.append(line)
-            
-        credentials_info["private_key"] = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(cleaned_lines) + "\n-----END PRIVATE KEY-----\n"
+        # Build pristine, isolated multi-line block layout
+        key_lines = [line.strip() for line in raw_key.split("\n") if line.strip()]
+        credentials_info["private_key"] = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(key_lines) + "\n-----END PRIVATE KEY-----\n"
 
     creds = service_account.Credentials.from_service_account_info(credentials_info, scopes=scopes)
     return gspread.authorize(creds)
