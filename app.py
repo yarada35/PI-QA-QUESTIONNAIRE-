@@ -162,7 +162,7 @@ def get_gspread_client():
         "https://www.googleapis.com/auth/drive"
     ]
     
-    # 1. Pull out standard environment properties completely separated from secrets references
+    # 1. Gather all secrets safe from background state modification
     target_source = {}
     if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
         target_source = dict(st.secrets["connections"]["gsheets"])
@@ -176,30 +176,31 @@ def get_gspread_client():
         if k in target_source:
             credentials_info[k] = str(target_source[k])
 
-    # 2. Strict execution to isolate the true raw block data and bypass the Byte(5,95) error
+    # 2. Strict execution to isolate raw key data block and avoid the Byte(5,95) label error
     if "private_key" in credentials_info:
         raw_key = credentials_info["private_key"].strip()
         
-        # Look for a clean Base64 chunk using a regex capture filter
+        # Strip structural variable assignment words down if accidentally embedded inside the value string
+        if "private_key" in raw_key:
+            # Matches variations like private_key=, private_key =, "private_key": etc.
+            raw_key = re.sub(r'(?i)^.*?\bprivate_key\b\s*[:=]\s*', '', raw_key).strip()
+
+        # Extract standard inner key data blocks via structural regular expressions
         crypto_payload = re.search(r"-----BEGIN PRIVATE KEY-----(.*)-----END PRIVATE KEY-----", raw_key, re.DOTALL)
         if crypto_payload:
             raw_key = crypto_payload.group(1).strip()
         else:
-            # If standard wrappers are missing, clean up structural assignment words completely
-            if "private_key" in raw_key:
-                raw_key = re.sub(r"^.*?private_key\s*[=:]\s*", "", raw_key).strip()
-            
-            # Wipe out internal wrapper blocks manually if needed
+            # Clean traditional text headers if mismatched
             raw_key = raw_key.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "").strip()
 
-        # Clean enclosing quote anomalies out
+        # Strip remaining enclosing single or double quotes
         if (raw_key.startswith('"') and raw_key.endswith('"')) or (raw_key.startswith("'") and raw_key.endswith("'")):
             raw_key = raw_key[1:-1]
 
-        # Fix structural newline assignments cleanly
+        # Normalize potential double-escaped formatting artifacts
         raw_key = raw_key.replace("\\n", "\n")
         
-        # Build pristine, isolated multi-line block layout
+        # Build pristine clean schema matrix lines
         key_lines = [line.strip() for line in raw_key.split("\n") if line.strip()]
         credentials_info["private_key"] = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(key_lines) + "\n-----END PRIVATE KEY-----\n"
 
