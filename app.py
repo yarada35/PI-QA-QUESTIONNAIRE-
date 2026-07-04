@@ -163,7 +163,7 @@ def get_gspread_client():
         "https://www.googleapis.com/auth/drive"
     ]
     
-    # 1. Rebuild basic standard key mappings safely
+    # 1. Gather all basic configuration dictionary definitions
     target_source = {}
     if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
         target_source = copy.deepcopy(dict(st.secrets["connections"]["gsheets"]))
@@ -177,34 +177,34 @@ def get_gspread_client():
         if k in target_source:
             credentials_info[k] = str(target_source[k])
 
-    # 2. GLOBAL STRING BACKUP EXTRACTOR
-    # If Streamlit completely garbled the fields, convert the entire secrets ecosystem to a text block
+    # 2. RAW TEXT POOL SANITIZATION
+    # Convert secrets object to a massive monolithic text block to parse out scrambled strings
     raw_dump = str(st.secrets)
     if "connections" in st.secrets:
         raw_dump += "\n" + str(st.secrets["connections"])
         if "gsheets" in st.secrets["connections"]:
             raw_dump += "\n" + str(st.secrets["connections"]["gsheets"])
 
-    # Clean character artifacts out of the raw dump text block
+    # Standardize newline escapes entirely
     raw_dump = raw_dump.replace("\\n", "\n").replace("\\\\n", "\n")
 
-    # 3. REGEX CRYPTO ISOLATOR
-    # Forcefully grab everything between the true PEM wrappers, ignoring text labels completely
+    # 3. REGEX KEY PAYLOAD ISOLATOR
+    # Forcefully grab the exact cryptographic sequence, bypassing variable leaks (like client_email =)
     crypto_match = re.search(r"-----BEGIN PRIVATE KEY-----(.*?)-----END PRIVATE KEY-----", raw_dump, re.DOTALL)
     
     if crypto_match:
         pure_crypto_body = crypto_match.group(1)
         
-        # Drop anything that isn't a true Base64 structural layout item
+        # Strip all formatting artifacts, symbols, quotes, commas, and trailing TOML keys
         pure_crypto_body = re.sub(r'[^A-Za-z0-9+/=\s]', '', pure_crypto_body)
         
-        # Build individual line frames cleanly
+        # Build individual line structures cleanly
         clean_lines = [line.strip() for line in pure_crypto_body.split("\n") if line.strip()]
         
-        # Package into the final dictionary securely
+        # Package directly inside the credential dictionary context
         credentials_info["private_key"] = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(clean_lines) + "\n-----END PRIVATE KEY-----\n"
     else:
-        # Fallback to standard property parsing if regex can't find clear tags
+        # Emergency processing fallback
         if "private_key" in credentials_info:
             fallback_key = credentials_info["private_key"].replace("\\n", "\n")
             fallback_key = fallback_key.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "")
@@ -239,7 +239,7 @@ def update_gsheet_data(spreadsheet_url_or_name, dataframe, worksheet_name="Sheet
     sheet.clear()
     sheet.update([dataframe.columns.values.tolist()] + dataframe.fillna("").values.tolist())
 
-# Locate targets cleanly
+# Detect sheet targets from configuration contexts
 spreadsheet_target = ""
 if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
     spreadsheet_target = st.secrets["connections"]["gsheets"].get("spreadsheet", "")
@@ -248,7 +248,7 @@ if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
 else:
     spreadsheet_target = st.secrets.get("spreadsheet", st.secrets.get("url", ""))
 
-# Load dataset framework
+# Load current active sheet frame
 df = read_gsheet_data(spreadsheet_target, "Sheet1")
 if not df.empty and 'Score' in df.columns:
     df['Score'] = pd.to_numeric(df['Score'], errors='coerce')
