@@ -150,10 +150,12 @@ emoji_options = ["1 🤬", "2 🙁", "3 😐", "4 🙂", "5 🤩"]
 emoji_clean_map = {"1": "🤬", "2": "🙁", "3": "😐", "4": "🙂", "5": "🤩"}
 
 # ==========================================
-# 3. EXPLICIT CONNECTION CONFIGURATION (Fixed NameError)
+# 3. EXPLICIT CONNECTION CONFIGURATION (Fixed Errors)
 # ==========================================
-# 1. Clean out the broken dashboard cache now that 'st' is imported safely
-if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
+# 1. Safely initialize or clear old instance configurations inside secrets internal map
+if "connections" not in st.secrets._secrets:
+    st.secrets._secrets["connections"] = {}
+elif "gsheets" in st.secrets._secrets["connections"]:
     del st.secrets._secrets["connections"]["gsheets"]
 
 # 2. Paste your UNALTERED credentials here directly from your downloaded Google JSON file
@@ -174,7 +176,7 @@ PASTE_YOUR_LONG_CRYPTO_KEY_STRING_HERE
 
 TARGET_SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID_HERE"
 
-# 3. Clean line breaks and format the key string natively
+# 3. Clean line breaks and force block body wrapping compatibility layout
 if "private_key" in GOOGLE_CREDENTIALS_DATA:
     raw_key = GOOGLE_CREDENTIALS_DATA["private_key"].replace("\\n", "\n").strip()
     header = "-----BEGIN PRIVATE KEY-----"
@@ -183,13 +185,14 @@ if "private_key" in GOOGLE_CREDENTIALS_DATA:
     chunks = [body[i:i+64] for i in range(0, len(body), 64)]
     GOOGLE_CREDENTIALS_DATA["private_key"] = f"{header}\n" + "\n".join(chunks) + f"\n{footer}\n"
 
-# 4. Initialize the connection safely with explicit parameters
-conn = st.connection(
-    "gsheets",
-    type=GSheetsConnection,
-    spreadsheet=TARGET_SPREADSHEET_URL,
+# 4. Inject credentials securely directly into the app context memory loop
+st.secrets._secrets["connections"]["gsheets"] = {
+    "spreadsheet": TARGET_SPREADSHEET_URL,
     **GOOGLE_CREDENTIALS_DATA
-)
+}
+
+# 5. Connect cleanly using compliant signature formats
+conn = st.connection("gsheets", type=GSheetsConnection)
 
 # Read master database directly from worksheet Sheet1
 try:
