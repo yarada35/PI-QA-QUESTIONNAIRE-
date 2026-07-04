@@ -150,10 +150,19 @@ emoji_options = ["1 🤬", "2 🙁", "3 😐", "4 🙂", "5 🤩"]
 emoji_clean_map = {"1": "🤬", "2": "🙁", "3": "😐", "4": "🙂", "5": "🤩"}
 
 # ==========================================
-# 3. DRIVER INITIALIZATION
+# 3. DRIVER INITIALIZATION WITH KEY SCRUBBER
 # ==========================================
-# ✅ Correct implementation: Streamlit automatically pulls credentials 
-# from secrets.toml matching the "gsheets" connection namespace.
+# Automatically processes raw string anomalies (\n escapes) before initialization
+try:
+    if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
+        raw_key = st.secrets["connections"]["gsheets"].get("private_key", "")
+        if "\\n" in raw_key:
+            scrubbed_key = raw_key.replace("\\n", "\n")
+            st.secrets["connections"]["gsheets"]["private_key"] = scrubbed_key
+except Exception:
+    pass
+
+# ✅ Streamlit pulls credentials directly from the verified secrets structure
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # Read master database directly from worksheet Sheet1
