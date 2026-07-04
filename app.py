@@ -168,7 +168,6 @@ def get_gspread_client():
     else:
         g_secrets = dict(st.secrets)
 
-    # Process and clean the credentials schema explicitly
     credentials_info = {}
     info_keys = ["type", "project_id", "private_key_id", "private_key", "client_email", "client_id", "auth_uri", "token_uri", "auth_provider_x509_cert_url", "client_x509_cert_url"]
     
@@ -180,7 +179,7 @@ def get_gspread_client():
     if "private_key" in credentials_info:
         raw_key = str(credentials_info["private_key"]).strip()
         
-        # If the secret is accidentally the raw JSON text body, unpack it
+        # Unpack raw JSON text wrapper if completely passed as one block
         if raw_key.startswith("{") and raw_key.endswith("}"):
             try:
                 parsed_json = json.loads(raw_key)
@@ -191,6 +190,13 @@ def get_gspread_client():
             except Exception:
                 pass
 
+        # FIX FOR INVALID BYTE (5, 95): Strip out literal variable prefixes inside the value string
+        if raw_key.startswith("private_key"):
+            if "=" in raw_key:
+                raw_key = raw_key.split("=", 1)[1].strip()
+            elif ":" in raw_key:
+                raw_key = raw_key.split(":", 1)[1].strip()
+
         # Strip enclosing string quote anomalies
         if (raw_key.startswith('"') and raw_key.endswith('"')) or (raw_key.startswith("'") and raw_key.endswith("'")):
             raw_key = raw_key[1:-1]
@@ -198,7 +204,7 @@ def get_gspread_client():
         # Standardize modern newline characters
         raw_key = raw_key.replace("\\n", "\n")
         
-        # Re-envelope data body strictly to ensure no syntax issues at index 5
+        # Isolate base64 data and drop corrupt headers
         lines = [line.strip() for line in raw_key.split("\n") if line.strip()]
         cleaned_lines = []
         for line in lines:
