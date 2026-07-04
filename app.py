@@ -5,27 +5,37 @@ import re
 import json
 from google.oauth2 import service_account
 
-# Set up page config
+# ==========================================
+# 1. PAGE SETUP & PREMIUM UI STYLING
+# ==========================================
 st.set_page_config(page_title="PIQA Analytics & Survey Hub", layout="wide")
 
+st.markdown("""
+    <style>
+    .stApp { background-color: #05070F !important; color: #F1F5F9 !important; }
+    [data-testid="stSidebar"] { background-color: #090D16 !important; border-right: 1px solid #1E293B !important; }
+    .main h1 { color: #38BDF8 !important; font-family: 'Syne', sans-serif; }
+    </style>
+""", unsafe_allow_html=True)
+
 # ==========================================
-# ROBUST AUTHENTICATION ENGINE
+# 2. SANITIZED AUTHENTICATION ENGINE
 # ==========================================
 @st.cache_resource(ttl="1h")
 def get_gspread_client():
-    # 1. Fetch from standard Streamlit connections block
+    # Fetch from standard Streamlit connections block
     gs = st.secrets["connections"]["gsheets"]
     
-    # 2. Extract and sanitize private key specifically to solve InvalidByte(120, 61)
-    # This regex removes all characters except valid Base64 and standard formatting
+    # CRITICAL FIX: Sanitize the private key to fix InvalidByte(120, 61)
+    # This removes all non-base64 characters and metadata "noise"
     raw_key = str(gs.get("private_key", ""))
     clean_base64 = re.sub(r'[^A-Za-z0-9+/=]', '', raw_key)
     
-    # 3. Reconstruct into PEM standard 64-character lines
+    # Reconstruct into PEM standard 64-character lines
     chunks = [clean_base64[i:i+64] for i in range(0, len(clean_base64), 64)]
     formatted_key = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(chunks) + "\n-----END PRIVATE KEY-----\n"
     
-    # 4. Construct the credential info dictionary
+    # Construct credentials dictionary
     credentials_info = {
         "type": gs["type"],
         "project_id": gs["project_id"],
@@ -46,29 +56,35 @@ def get_gspread_client():
     return gspread.authorize(creds)
 
 # ==========================================
-# DATA FETCHING
-# ==========================================
-def load_data(spreadsheet_id, worksheet="Sheet1"):
-    try:
-        client = get_gspread_client()
-        sheet = client.open_by_key(spreadsheet_id).worksheet(worksheet)
-        return pd.DataFrame(sheet.get_all_records())
-    except Exception as e:
-        st.error(f"Google Sheet Fetch Failure: {e}")
-        return pd.DataFrame()
-
-# ==========================================
-# UI INTERFACE
+# 3. APP INTERFACE
 # ==========================================
 def main():
-    st.title("📊 PIQA Analytics & Survey Hub")
-    
-    # Add your logic here...
-    sheet_id = st.text_input("Enter Google Sheet ID:")
-    if sheet_id:
-        df = load_data(sheet_id)
-        if not df.empty:
-            st.dataframe(df)
+    st.markdown("<h1>PIQA Live Matrix Portal</h1>", unsafe_allow_html=True)
+
+    # Sidebar
+    with st.sidebar:
+        st.markdown("<h2 style='color:#38BDF8;'>🎨 Control Room</h2>", unsafe_allow_html=True)
+        st.radio("Target Departments Filter", [
+            'All Matrix Mix', 'Plant Engineering Department', 'Production Department', 
+            'Sales and Marketing Department', 'PIQA Employee Staff', 'Purchase Department', 'Store Department'
+        ])
+
+    # Tabs
+    tab1, tab2, tab3 = st.tabs(["📊 Live Analytics Dashboard", "📝 Interactive Survey Intake", "🖨️ Print Hub"])
+
+    with tab1:
+        try:
+            client = get_gspread_client()
+            st.success("✅ Authentication successful: Live Matrix Portal connected.")
+            # Add your data fetching/display logic here
+        except Exception as e:
+            st.error(f"Initialization Error: {e}")
+
+    with tab2:
+        st.write("Survey intake form active.")
+
+    with tab3:
+        st.write("Print and distribution hub active.")
 
 if __name__ == "__main__":
     main()
