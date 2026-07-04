@@ -6,6 +6,7 @@ from datetime import datetime
 import gspread
 import json
 import re
+import copy
 from google.oauth2 import service_account
 
 # ==========================================
@@ -162,12 +163,12 @@ def get_gspread_client():
         "https://www.googleapis.com/auth/drive"
     ]
     
-    # 1. Gather all secrets safe from background state modification
+    # 1. Gather all secrets using a safe deep copy to isolate reference structures
     target_source = {}
     if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
-        target_source = dict(st.secrets["connections"]["gsheets"])
+        target_source = copy.deepcopy(dict(st.secrets["connections"]["gsheets"]))
     else:
-        target_source = dict(st.secrets)
+        target_source = copy.deepcopy(dict(st.secrets))
 
     credentials_info = {}
     info_keys = ["type", "project_id", "private_key_id", "private_key", "client_email", "client_id", "auth_uri", "token_uri", "auth_provider_x509_cert_url", "client_x509_cert_url"]
@@ -176,32 +177,29 @@ def get_gspread_client():
         if k in target_source:
             credentials_info[k] = str(target_source[k])
 
-    # 2. Strict execution to isolate raw key data block and avoid the Byte(5,95) label error
+    # 2. Hardened PEM Extraction Core (Bypasses InvalidByte errors completely)
     if "private_key" in credentials_info:
-        raw_key = credentials_info["private_key"].strip()
+        raw_key = credentials_info["private_key"]
         
-        # Strip structural variable assignment words down if accidentally embedded inside the value string
-        if "private_key" in raw_key:
-            # Matches variations like private_key=, private_key =, "private_key": etc.
-            raw_key = re.sub(r'(?i)^.*?\bprivate_key\b\s*[:=]\s*', '', raw_key).strip()
-
-        # Extract standard inner key data blocks via structural regular expressions
-        crypto_payload = re.search(r"-----BEGIN PRIVATE KEY-----(.*)-----END PRIVATE KEY-----", raw_key, re.DOTALL)
-        if crypto_payload:
-            raw_key = crypto_payload.group(1).strip()
-        else:
-            # Clean traditional text headers if mismatched
-            raw_key = raw_key.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "").strip()
-
-        # Strip remaining enclosing single or double quotes
-        if (raw_key.startswith('"') and raw_key.endswith('"')) or (raw_key.startswith("'") and raw_key.endswith("'")):
-            raw_key = raw_key[1:-1]
-
-        # Normalize potential double-escaped formatting artifacts
+        # Normalize newline escaping safely
         raw_key = raw_key.replace("\\n", "\n")
         
-        # Build pristine clean schema matrix lines
+        # Strip structural headers/footers if they are explicitly present
+        raw_key = raw_key.replace("-----BEGIN PRIVATE KEY-----", "")
+        raw_key = raw_key.replace("-----END PRIVATE KEY-----", "")
+        
+        # Remove variable assignment leftovers (e.g., 'private_key = ', '"private_key":')
+        if "private_key" in raw_key:
+            raw_key = re.sub(r'(?i)^.*?\bprivate_key\b\s*[:=]\s*', '', raw_key)
+            
+        # THE FIX: Strip away EVERYTHING that isn't valid Base64 payload data or newlines.
+        # This explicitly purges accidental decimals, version numbers (like '5.0'), and TOML artifacts.
+        raw_key = re.sub(r'[^A-Za-z0-9+/=\s]', '', raw_key)
+        
+        # Segment into clear standardized blocks
         key_lines = [line.strip() for line in raw_key.split("\n") if line.strip()]
+        
+        # Re-envelope into standard cryptographic PEM layout
         credentials_info["private_key"] = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(key_lines) + "\n-----END PRIVATE KEY-----\n"
 
     creds = service_account.Credentials.from_service_account_info(credentials_info, scopes=scopes)
