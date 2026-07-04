@@ -3,7 +3,8 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 from datetime import datetime
-from streamlit_gsheets import GSheetsConnection
+import gspread
+from google.oauth2 import service_account
 
 # ==========================================
 # 1. PAGE & INITIALIZATION SETUP
@@ -150,62 +151,91 @@ emoji_options = ["1 🤬", "2 🙁", "3 😐", "4 🙂", "5 🤩"]
 emoji_clean_map = {"1": "🤬", "2": "🙁", "3": "😐", "4": "🙂", "5": "🤩"}
 
 # ==========================================
-# 3. ADVANCED CRYPTOGRAPHIC REPAIR & INITIALIZATION
+# 3. DIRECT RAW GOOGLE CREDENTIALS INJECTION
 # ==========================================
-# Create a mutable Python dict copy of the secrets context to strip read-only blocks safely
-connection_kwargs = {}
-
-try:
+@st.cache_resource(ttl="1h")
+def get_gspread_client():
+    # Scopes needed for Google Sheets and Google Drive connection
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    
+    # 1. Pull the raw service account layout details from secrets context safely
     if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
-        # Cast the read-only configuration context into a normal editable dict
         g_secrets = dict(st.secrets["connections"]["gsheets"])
+    else:
+        # Fallback if your layout structure is root-level keys
+        g_secrets = dict(st.secrets)
+
+    # 2. Extract and sanitize the private key string manually
+    if "private_key" in g_secrets:
+        raw_key = g_secrets["private_key"]
         
-        if "private_key" in g_secrets:
-            key_str = g_secrets["private_key"]
+        # Remove literal wrap quotes if present
+        if (raw_key.startswith('"') and raw_key.endswith('"')) or (raw_key.startswith("'") and raw_key.endswith("'")):
+            raw_key = raw_key[1:-1]
             
-            # 1. Strip external string layout literal wrapping quotes if present
-            if (key_str.startswith('"') and key_str.endswith('"')) or (key_str.startswith("'") and key_str.endswith("'")):
-                key_str = key_str[1:-1]
-            
-            # 2. Convert explicit '\\n' tracking combinations into actual newlines
-            key_str = key_str.replace("\\n", "\n")
-            
-            # 3. Clean up formatting whitespace patterns
-            lines = [line.strip() for line in key_str.split("\n") if line.strip()]
-            
-            # 4. Construct structural PEM layout block explicitly
-            cleaned_lines = []
-            for line in lines:
-                if "BEGIN PRIVATE KEY" in line:
-                    cleaned_lines.append("-----BEGIN PRIVATE KEY-----")
-                elif "END PRIVATE KEY" in line:
-                    cleaned_lines.append("-----END PRIVATE KEY-----")
-                else:
-                    cleaned_lines.append(line)
-            
-            final_pem_key = "\n".join(cleaned_lines)
-            
-            # Assign the verified cleaned key to our mutable payload dictionary
-            g_secrets["private_key"] = final_pem_key
-            
-        # Collect all parameters to override the default connection defaults
-        connection_kwargs = g_secrets
-except Exception as e:
-    st.sidebar.error(f"Configuration Adjustment Trace: {e}")
+        # Replace explicit string literal character escapes with structural line returns
+        raw_key = raw_key.replace("\\n", "\n")
+        
+        # Build pristine clean lines framework
+        lines = [line.strip() for line in raw_key.split("\n") if line.strip()]
+        cleaned_lines = []
+        for line in lines:
+            if "BEGIN PRIVATE KEY" in line:
+                cleaned_lines.append("-----BEGIN PRIVATE KEY-----")
+            elif "END PRIVATE KEY" in line:
+                cleaned_lines.append("-----END PRIVATE KEY-----")
+            else:
+                cleaned_lines.append(line)
+        
+        g_secrets["private_key"] = "\n".join(cleaned_lines)
 
-# Initialize GSheets Driver Connection instance with our verified dictionary payload override
-if connection_kwargs:
-    conn = st.connection("gsheets", type=GSheetsConnection, **connection_kwargs)
-else:
-    conn = st.connection("gsheets", type=GSheetsConnection)
+    # 3. Fallback assignments if keys are named differently in secrets.toml configuration
+    info_keys = ["type", "project_id", "private_key_id", "private_key", "client_email", "client_id", "auth_uri", "token_uri", "auth_provider_x509_cert_url", "client_x509_cert_url"]
+    credentials_info = {k: g_secrets.get(k) for k in info_keys if k in g_secrets}
 
-# Read master database directly from worksheet Sheet1
-try:
-    df = conn.read(worksheet="Sheet1", ttl="0d")
+    # 4. Generate native credentials object safely
+    creds = service_account.Credentials.from_service_account_info(credentials_info, scopes=scopes)
+    return gspread.authorize(creds)
+
+# Helper functions to replace conn.read() and conn.update()
+def read_gsheet_data(spreadsheet_url_or_name, worksheet_name="Sheet1"):
+    try:
+        client = get_gspread_client()
+        # Open by URL if provided, otherwise open by name context
+        if spreadsheet_url_or_name.startswith("http"):
+            sheet = client.open_by_url(spreadsheet_url_or_name).worksheet(worksheet_name)
+        else:
+            sheet = client.open(spreadsheet_url_or_name).worksheet(worksheet_name)
+            
+        records = sheet.get_all_records()
+        return pd.DataFrame(records)
+    except Exception as e:
+        st.error(f"Google Sheet Fetch Failure: {e}")
+        return pd.DataFrame(columns=["RespondentID", "Department", "Question Number", "Criteria Description", "Score", "Emoji", "Sentiment", "Tenure"])
+
+def update_gsheet_data(spreadsheet_url_or_name, dataframe, worksheet_name="Sheet1"):
+    client = get_gspread_client()
+    if spreadsheet_url_or_name.startswith("http"):
+        sheet = client.open_by_url(spreadsheet_url_or_name).worksheet(worksheet_name)
+    else:
+        sheet = client.open(spreadsheet_url_or_name).worksheet(worksheet_name)
+        
+    # Clear spreadsheet and write updated dataframe columns + data matrix rows
+    sheet.clear()
+    sheet.update([dataframe.columns.values.tolist()] + dataframe.fillna("").values.tolist())
+
+# Fetch spreadsheet identifier from configurations context
+spreadsheet_target = st.secrets["connections"]["gsheets"].get("spreadsheet", "")
+if not spreadsheet_target:
+    spreadsheet_target = st.secrets["connections"]["gsheets"].get("url", "Sheet1")
+
+# Load operational dataframe from data store engine
+df = read_gsheet_data(spreadsheet_target, "Sheet1")
+if not df.empty and 'Score' in df.columns:
     df['Score'] = pd.to_numeric(df['Score'], errors='coerce')
-except Exception as e:
-    st.error(f"Database Read Warning: {e}")
-    df = pd.DataFrame(columns=["RespondentID", "Department", "Question Number", "Criteria Description", "Score", "Emoji", "Sentiment", "Tenure"])
 
 def clear_global_filters():
     for k in ["dash_dept_radio", "dash_tenure_seg"]:
@@ -345,13 +375,16 @@ with tab_survey:
                 })
             
             new_df = pd.DataFrame(new_rows)
+            # Match existing schema explicitly
+            for col in df.columns:
+                if col not in new_df.columns:
+                    new_df[col] = ""
+            new_df = new_df[df.columns]
+            
             updated_master_df = pd.concat([df, new_df], ignore_index=True)
             
             try:
-                conn.update(
-                    worksheet="Sheet1",
-                    data=updated_master_df
-                )
+                update_gsheet_data(spreadsheet_target, updated_master_df, "Sheet1")
                 st.success("🎉 Evaluation captured securely inside the cloud database! Refresh page to update metrics.")
                 st.balloons()
             except Exception as e:
