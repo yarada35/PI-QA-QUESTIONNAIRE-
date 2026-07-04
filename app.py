@@ -9,12 +9,11 @@ st.set_page_config(page_title="PIQA Live Matrix Portal", layout="wide")
 @st.cache_resource(ttl="1h")
 def get_gspread_client():
     """
-    Loads credentials directly from Streamlit secrets. 
-    The library natively handles the dictionary structure 
-    and PEM formatting without manual string manipulation.
+    Loads credentials from a flat secret structure.
+    This bypasses nested dictionaries that cause handshake failures.
     """
-    # Fetch the connection block as a dictionary from secrets
-    creds_dict = st.secrets["connections"]["gsheets"]
+    # Load all secrets as a flat dictionary
+    creds_dict = st.secrets
     
     # Initialize credentials directly
     creds = service_account.Credentials.from_service_account_info(
@@ -27,13 +26,13 @@ def get_gspread_client():
 def main():
     st.markdown("<h1>PIQA Live Matrix Portal</h1>", unsafe_allow_html=True)
     
-    # Handle connection and UI rendering separately to prevent blank pages
+    # Separate connection attempt from UI rendering to prevent blank screens
     try:
         client = get_gspread_client()
         st.success("✅ Dashboard Connected Successfully")
     except Exception as e:
         st.error("Authentication Error: Configuration handshake failed.")
-        st.info("Ensure your Secrets panel contains the full, valid JSON structure.")
+        st.info("Ensure your Secrets panel contains the flat, full JSON structure.")
         with st.expander("See Diagnostic Logs"):
             st.code(str(e))
 
