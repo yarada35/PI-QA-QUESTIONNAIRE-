@@ -127,7 +127,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. RESTORED FULL VERBATIM MATRIX METADATA
+# 2. FULL VERBATIM MATRIX METADATA
 # ==========================================
 DEPARTMENT_QUESTIONS = {
     "Plant Engineering Department": [
@@ -183,32 +183,13 @@ emoji_options = ["1 🤬", "2 🙁", "3 😐", "4 🙂", "5 🤩"]
 emoji_map = {1: "🤬", 2: "🙁", 3: "😐", 4: "🙂", 5: "🤩"}
 
 # ==========================================
-# 3. GLOBAL REAL-TIME DATA HUB (SHARED MEMORY)
+# 3. GLOBAL FRESH SLATE REAL-TIME DATA HUB
 # ==========================================
 @st.cache_resource
 def get_global_realtime_database():
-    """Initializes a shared in-memory dataset that persists across all cloud user connections."""
-    np.random.seed(42)
+    """Initializes a blank dataset container. Previous historical seed records are removed."""
+    # Starting with a clean list ignores past pre-population and awaits live entries.
     records = []
-    tenures = ['< 1 Year', '1-3 Years', '3+ Years']
-    
-    for dept, questions in DEPARTMENT_QUESTIONS.items():
-        for tenure in tenures:
-            num_respondents = int(np.random.randint(8, 20)) 
-            for resp_id in range(num_respondents):
-                unique_survey_id = f"RESP_{dept[:3].upper()}_{tenure[:2]}_{resp_id}"
-                for q_idx, question in enumerate(questions):
-                    score = int(np.random.choice([1, 2, 3, 4, 5], p=[0.05, 0.07, 0.15, 0.50, 0.23]))
-                    records.append({
-                        "RespondentID": unique_survey_id,
-                        "Department": dept,
-                        "Question Number": f"Q{q_idx + 1}",
-                        "Criteria Description": question,
-                        "Score": score,
-                        "Emoji": emoji_map[score],
-                        "Sentiment": "Positive" if score > 3 else ("Neutral" if score == 3 else "Negative"),
-                        "Tenure": tenure
-                    })
     return records
 
 global_db_reference = get_global_realtime_database()
@@ -235,9 +216,12 @@ with st.sidebar:
     
     st.markdown("<hr style='border-color: #1E293B;'/>", unsafe_allow_html=True)
     st.markdown("<b style='color:#F1F5F9; font-size: 0.95rem;'>Demographic Filtering Crosstab:</b>", unsafe_allow_html=True)
+    
+    # Safely extract dynamic tenure options if data exists, otherwise default fallback list
+    tenure_options = list(df['Tenure'].unique()) if not df.empty else ['< 1 Year', '1-3 Years', '3+ Years']
     selected_tenure = st.segmented_control(
         label="Employee Tenure Filter",
-        options=['All Mix'] + list(df['Tenure'].unique()),
+        options=['All Mix'] + tenure_options,
         default='All Mix',
         key="dash_tenure_seg"
     )
@@ -250,15 +234,30 @@ with st.sidebar:
             del st.session_state[key]
         st.rerun()
 
-# Apply filter sets over database reference
-filtered_df = df.copy()
-if selected_dept != 'All Matrix Mix':
-    filtered_df = filtered_df[filtered_df['Department'] == selected_dept]
-if selected_tenure != 'All Mix':
-    filtered_df = filtered_df[filtered_df['Tenure'] == selected_tenure]
+# Apply filter sets safely over database reference
+if not df.empty:
+    filtered_df = df.copy()
+    if selected_dept != 'All Matrix Mix':
+        filtered_df = filtered_df[filtered_df['Department'] == selected_dept]
+    if selected_tenure != 'All Mix':
+        filtered_df = filtered_df[filtered_df['Tenure'] == selected_tenure]
+    
+    distinct_active_respondents = filtered_df['RespondentID'].nunique()
+    avg_score = round(filtered_df['Score'].mean(), 2)
+    pos_pct = round((len(filtered_df[filtered_df['Sentiment'] == 'Positive']) / len(filtered_df)) * 100)
+    
+    try:
+        mode_score = int(filtered_df['Score'].mode()[0])
+    except:
+        mode_score = 3
+else:
+    filtered_df = pd.DataFrame()
+    distinct_active_respondents = 0
+    avg_score = 0.0
+    pos_pct = 0
+    mode_score = 3
 
-distinct_active_respondents = filtered_df['RespondentID'].nunique()
-avg_score = round(filtered_df['Score'].mean(), 2) if not filtered_df.empty else 0.0
+emoji_star = emoji_map.get(mode_score, "😐")
 
 # Multi-Tab Configuration
 tab_dash, tab_survey, tab_print = st.tabs([
@@ -279,19 +278,23 @@ with tab_dash:
     with col2:
         st.markdown(f'<div class="metric-card" style="border-left-color: #34D399;"><p style="color:#34D399; font-size: 0.8rem; text-transform: uppercase; font-weight:600; margin-bottom:4px;">Total Sample Respondents</p><h2 style="font-family:\'Space Grotesk\'; font-size:2.2rem; color:#F8FAFC; margin:0;">{distinct_active_respondents} <span style="font-size:1.1rem; color:#94A3B8;">Staff</span></h2></div>', unsafe_allow_html=True)
     with col3:
-        pos_pct = round((len(filtered_df[filtered_df['Sentiment'] == 'Positive']) / len(filtered_df)) * 100) if not filtered_df.empty else 0
         st.markdown(f'<div class="metric-card" style="border-left-color: #34D399;"><p style="color:#94A3B8; font-size: 0.8rem; text-transform: uppercase; font-weight:600; margin-bottom:4px;">Satisfaction Index</p><h2 style="font-family:\'Space Grotesk\'; font-size:2.2rem; color:#F8FAFC; margin:0;">{pos_pct}%</h2></div>', unsafe_allow_html=True)
     with col4:
-        mode_score = int(filtered_df['Score'].mode()[0]) if not filtered_df.empty else 3
-        emoji_star = emoji_map.get(mode_score, "😐")
-        st.markdown(f'<div class="metric-card" style="border-left-color: #FBBF24;"><p style="color:#94A3B8; font-size: 0.8rem; text-transform: uppercase; font-weight:600; margin-bottom:4px;">Dominant Sentiment</p><h2 style="font-family:\'Space Grotesk\'; font-size:2.2rem; color:#F8FAFC; margin:0;">Level {mode_score} {emoji_star}</h2></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card" style="border-left-color: #FBBF24;"><p style="color:#94A3B8; font-size: 0.8rem; text-transform: uppercase; font-weight:600; margin-bottom:4px;">Dominant Sentiment</p><h2 style="font-family:\'Space Grotesk\'; font-size:2.2rem; color:#F8FAFC; margin:0;">{("Level " + str(mode_score) + " " + emoji_star) if distinct_active_respondents > 0 else "Pending"}</h2></div>', unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
     st.markdown("<div class='section-title'>📋 Total Number of Respondents Matrix (Observation Breakdown)</div>", unsafe_allow_html=True)
-    respondent_matrix = df.groupby(['Department', 'Tenure'])['RespondentID'].nunique().unstack(fill_value=0)
-    respondent_matrix['Total Fleet'] = respondent_matrix.sum(axis=1)
-    st.dataframe(respondent_matrix, use_container_width=True)
+    if not df.empty:
+        respondent_matrix = df.groupby(['Department', 'Tenure'])['RespondentID'].nunique().unstack(fill_value=0)
+        # Ensure all columns exist for presentation structure uniformity
+        for col in ['< 1 Year', '1-3 Years', '3+ Years']:
+            if col not in respondent_matrix.columns:
+                respondent_matrix[col] = 0
+        respondent_matrix['Total Fleet'] = respondent_matrix.sum(axis=1)
+        st.dataframe(respondent_matrix, use_container_width=True)
+    else:
+        st.info("💡 **Awaiting Initial Deployments:** The matrix table will automatically map out cross-tabulations once live survey data hits the registry hub.")
 
     c1, c2 = st.columns([3, 2])
     with c1:
@@ -300,11 +303,9 @@ with tab_dash:
             question_chart_data = filtered_df.groupby('Criteria Description')['Score'].mean().reset_index().sort_values(by='Score')
             fig_bar = px.bar(question_chart_data, x='Score', y='Criteria Description', orientation='h', color='Score', color_continuous_scale='Blues', text_auto='.2f', template="plotly_dark")
             fig_bar.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_family="Inter", xaxis=dict(title=dict(text="Average Score Value Out of 5.0", font=dict(color='#FFFFFF')), range=[1, 5], gridcolor='#1E293B'), yaxis=dict(title=None, showticklabels=False), coloraxis_showscale=False)
-            
-            # config={'staticPlot': True} stops touch drag zoom distortion actions completely
             st.plotly_chart(fig_bar, use_container_width=True, config={'staticPlot': True})
         else:
-            st.info("Select options inside the filter controls to populate criteria records.")
+            st.info("No data entries logged for the selected profile metrics yet.")
             
     with c2:
         st.markdown("<div class='section-title'>🍕 Sentiment Proportions</div>", unsafe_allow_html=True)
@@ -312,18 +313,17 @@ with tab_dash:
             sentiment_data = filtered_df['Sentiment'].value_counts().reset_index()
             fig_pie = px.pie(sentiment_data, values='count', names='Sentiment', color='Sentiment', color_discrete_map={'Positive': '#34D399', 'Neutral': '#FBBF24', 'Negative': '#F87171'}, hole=0.5, template="plotly_dark")
             fig_pie.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_family="Inter")
-            
-            # Lock the pie chart securely against accidental touch moves
             st.plotly_chart(fig_pie, use_container_width=True, config={'staticPlot': True})
 
     # Cross-Tab Heatmap
     st.markdown("<div class='section-title'>⚡ Questionnaire Heatmap Matrix (All Departments Cross-Tabulation View)</div>", unsafe_allow_html=True)
-    xtab = pd.crosstab(df['Department'], df['Score'], normalize='index') * 100
-    fig_heat = px.imshow(xtab.round(1), text_auto=True, labels=dict(x="Likert Scale Rating Score Profile", y="Department Hub", color="Percentage (%)"), x=['1 (Strongly Disagree)', '2 (Disagree)', '3 (Neutral)', '4 (Agree)', '5 (Strongly Agree)'], color_continuous_scale='Mint', template="plotly_dark")
-    fig_heat.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_family="Inter")
-    
-    # Lock the heatmap layout cleanly
-    st.plotly_chart(fig_heat, use_container_width=True, config={'staticPlot': True})
+    if not df.empty:
+        xtab = pd.crosstab(df['Department'], df['Score'], normalize='index') * 100
+        fig_heat = px.imshow(xtab.round(1), text_auto=True, labels=dict(x="Likert Scale Rating Score Profile", y="Department Hub", color="Percentage (%)"), x=['1 (Strongly Disagree)', '2 (Disagree)', '3 (Neutral)', '4 (Agree)', '5 (Strongly Agree)'], color_continuous_scale='Mint', template="plotly_dark")
+        fig_heat.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_family="Inter")
+        st.plotly_chart(fig_heat, use_container_width=True, config={'staticPlot': True})
+    else:
+        st.info("Heatmap visualization requires at least one transmitted evaluation entry log.")
 
 # ==========================================
 # VIEW 2: INTERACTIVE SURVEY INTAKE
@@ -401,13 +401,14 @@ with tab_print:
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("### 📤 Export Raw Consolidated Matrices")
         
-        csv_buffer = filtered_df.to_csv(index=False).encode('utf-8')
+        csv_buffer = filtered_df.to_csv(index=False).encode('utf-8') if not filtered_df.empty else b""
         st.download_button(
             label="📥 Export Current Slice Dataset to CSV",
             data=csv_buffer,
             file_name=f"PIQA_Export_{selected_dept.replace(' ', '_')}.csv",
             mime="text/csv",
-            use_container_width=True
+            use_container_width=True,
+            disabled=filtered_df.empty
         )
         
     with c_print_2:
@@ -419,7 +420,7 @@ Employee Tenure Profile Mix: {selected_tenure}
 ---------------------------------------------
 * Total Validated Respondents Group: {distinct_active_respondents} Staff
 * Active Composite Mean Metric Score: {avg_score} / 5.0
-* Current Operational Quality Index Status: {"⚠️ Threshold Gaps Detected" if avg_score < 3.8 else "✅ Healthy Baseline Standard"}
+* Current Operational Quality Index Status: {"⚠️ Awaiting Deployment Data" if distinct_active_respondents == 0 else ("⚠️ Threshold Gaps Detected" if avg_score < 3.8 else "✅ Healthy Baseline Standard")}
 ---------------------------------------------"""
         
         st.text_area("📋 Copy Distribution Summary Block:", value=summary_share_string, height=200)
