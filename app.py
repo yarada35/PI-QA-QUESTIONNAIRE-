@@ -188,7 +188,6 @@ emoji_map = {1: "🤬", 2: "🙁", 3: "😐", 4: "🙂", 5: "🤩"}
 @st.cache_resource
 def get_global_realtime_database():
     """Initializes a blank dataset container. Previous historical seed records are removed."""
-    # Starting with a clean list ignores past pre-population and awaits live entries.
     records = []
     return records
 
@@ -217,7 +216,6 @@ with st.sidebar:
     st.markdown("<hr style='border-color: #1E293B;'/>", unsafe_allow_html=True)
     st.markdown("<b style='color:#F1F5F9; font-size: 0.95rem;'>Demographic Filtering Crosstab:</b>", unsafe_allow_html=True)
     
-    # Safely extract dynamic tenure options if data exists, otherwise default fallback list
     tenure_options = list(df['Tenure'].unique()) if not df.empty else ['< 1 Year', '1-3 Years', '3+ Years']
     selected_tenure = st.segmented_control(
         label="Employee Tenure Filter",
@@ -287,7 +285,6 @@ with tab_dash:
     st.markdown("<div class='section-title'>📋 Total Number of Respondents Matrix (Observation Breakdown)</div>", unsafe_allow_html=True)
     if not df.empty:
         respondent_matrix = df.groupby(['Department', 'Tenure'])['RespondentID'].nunique().unstack(fill_value=0)
-        # Ensure all columns exist for presentation structure uniformity
         for col in ['< 1 Year', '1-3 Years', '3+ Years']:
             if col not in respondent_matrix.columns:
                 respondent_matrix[col] = 0
@@ -315,10 +312,16 @@ with tab_dash:
             fig_pie.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_family="Inter")
             st.plotly_chart(fig_pie, use_container_width=True, config={'staticPlot': True})
 
-    # Cross-Tab Heatmap
+    # Cross-Tab Heatmap (CRASH-PROOF GATE)
     st.markdown("<div class='section-title'>⚡ Questionnaire Heatmap Matrix (All Departments Cross-Tabulation View)</div>", unsafe_allow_html=True)
     if not df.empty:
         xtab = pd.crosstab(df['Department'], df['Score'], normalize='index') * 100
+        # Dynamically map missing scale scores to guarantee 5 columns exist
+        for i in [1, 2, 3, 4, 5]:
+            if i not in xtab.columns:
+                xtab[i] = 0.0
+        xtab = xtab[[1, 2, 3, 4, 5]]
+        
         fig_heat = px.imshow(xtab.round(1), text_auto=True, labels=dict(x="Likert Scale Rating Score Profile", y="Department Hub", color="Percentage (%)"), x=['1 (Strongly Disagree)', '2 (Disagree)', '3 (Neutral)', '4 (Agree)', '5 (Strongly Agree)'], color_continuous_scale='Mint', template="plotly_dark")
         fig_heat.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_family="Inter")
         st.plotly_chart(fig_heat, use_container_width=True, config={'staticPlot': True})
