@@ -20,19 +20,16 @@ st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght=400;600;700&family=Syne:wght=700;800&family=Inter:wght=400;500;600;700&display=swap');
     
-    /* Main App Deep Dark Background */
     .stApp {
         background-color: #05070F !important;
         color: #F1F5F9 !important;
     }
     
-    /* Compatible Black Sidebar Target */
     [data-testid="stSidebar"] {
         background-color: #090D16 !important;
         border-right: 1px solid #1E293B !important;
     }
     
-    /* GLOWING SHINY REFLECTIVE YELLOW SIDEBAR DEPARTMENT LABELS */
     [data-testid="stSidebar"] .stRadio [data-testid="stWidgetLabel"] + div label p {
         font-family: 'Space Grotesk', sans-serif !important;
         color: #FBBF24 !important;
@@ -42,13 +39,11 @@ st.markdown("""
         transition: all 0.2s ease;
     }
     
-    /* Hover effect for sidebar labels */
     [data-testid="stSidebar"] .stRadio [data-testid="stWidgetLabel"] + div label:hover p {
         color: #FFE082 !important;
         text-shadow: 0px 0px 14px rgba(251, 191, 36, 0.9) !important;
     }
 
-    /* Main App Header Text styling */
     .main h1 {
         font-family: 'Syne', sans-serif;
         font-weight: 800;
@@ -75,7 +70,6 @@ st.markdown("""
         font-family: 'Inter', sans-serif;
     }
     
-    /* Main selection tabs: Big, Bold, and Reflective */
     .stTabs [data-baseweb="tab-list"] button {
         font-size: 1.6rem !important;
         font-weight: 800 !important;
@@ -84,14 +78,12 @@ st.markdown("""
         font-family: 'Syne', sans-serif !important;
         transition: all 0.3s ease;
     }
-    /* Active reflective state when selected */
     .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
         color: #34D399 !important;
         border-bottom: 4px solid #34D399 !important;
         text-shadow: 0px 0px 12px rgba(52, 211, 153, 0.6);
     }
     
-    /* Premium Glossy Dark Metric Cards */
     .metric-card {
         background: #111827;
         border-radius: 16px;
@@ -219,7 +211,6 @@ def get_global_realtime_database():
                     })
     return records
 
-# Retrieve a shared reference to the cluster memory state list
 global_db_reference = get_global_realtime_database()
 df = pd.DataFrame(global_db_reference)
 
@@ -228,7 +219,7 @@ st.markdown("<h1>PIQA Matrix Interface Portal</h1>", unsafe_allow_html=True)
 st.markdown("<p style='color:#94A3B8; font-size:1.1rem; margin-bottom: 1.5rem;'>Unified suite for real-time live operational analysis and internal feedback collection loops.</p>", unsafe_allow_html=True)
 
 # ==========================================
-# 4. CONTROL ROOM SIDEBAR (UN-GATED)
+# 4. CONTROL ROOM SIDEBAR
 # ==========================================
 with st.sidebar:
     st.markdown("<h2 style='font-family:\"Syne\"; color:#38BDF8; margin-top:0;'>🎨 Control Room</h2>", unsafe_allow_html=True)
@@ -251,10 +242,8 @@ with st.sidebar:
         key="dash_tenure_seg"
     )
     
-    # RESET APP ENGINE WORKSPACE 
     st.markdown("<hr style='border-color: #1E293B;'/>", unsafe_allow_html=True)
     st.markdown("<b style='color:#FBBF24; font-size: 0.95rem;'>🔄 Reset Workspace</b>", unsafe_allow_html=True)
-    st.markdown("<p style='color:#94A3B8; font-size:0.8rem; margin-bottom:8px;'>Wipe configuration selections and start over from default landing view layout.</p>", unsafe_allow_html=True)
     
     if st.button("Reset Matrix Framework", type="secondary", use_container_width=True):
         for key in list(st.session_state.keys()):
@@ -271,7 +260,7 @@ if selected_tenure != 'All Mix':
 distinct_active_respondents = filtered_df['RespondentID'].nunique()
 avg_score = round(filtered_df['Score'].mean(), 2) if not filtered_df.empty else 0.0
 
-# Multi-Tab Configuration including the separate Print Hub Tab
+# Multi-Tab Configuration
 tab_dash, tab_survey, tab_print = st.tabs([
     "📊 Live Global Analytics Dashboard", 
     "📝 Interactive Survey Intake", 
@@ -311,7 +300,9 @@ with tab_dash:
             question_chart_data = filtered_df.groupby('Criteria Description')['Score'].mean().reset_index().sort_values(by='Score')
             fig_bar = px.bar(question_chart_data, x='Score', y='Criteria Description', orientation='h', color='Score', color_continuous_scale='Blues', text_auto='.2f', template="plotly_dark")
             fig_bar.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_family="Inter", xaxis=dict(title=dict(text="Average Score Value Out of 5.0", font=dict(color='#FFFFFF')), range=[1, 5], gridcolor='#1E293B'), yaxis=dict(title=None, showticklabels=False), coloraxis_showscale=False)
-            st.plotly_chart(fig_bar, use_container_width=True)
+            
+            # config={'staticPlot': True} stops touch drag zoom distortion actions completely
+            st.plotly_chart(fig_bar, use_container_width=True, config={'staticPlot': True})
         else:
             st.info("Select options inside the filter controls to populate criteria records.")
             
@@ -321,21 +312,24 @@ with tab_dash:
             sentiment_data = filtered_df['Sentiment'].value_counts().reset_index()
             fig_pie = px.pie(sentiment_data, values='count', names='Sentiment', color='Sentiment', color_discrete_map={'Positive': '#34D399', 'Neutral': '#FBBF24', 'Negative': '#F87171'}, hole=0.5, template="plotly_dark")
             fig_pie.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_family="Inter")
-            st.plotly_chart(fig_pie, use_container_width=True)
+            
+            # Lock the pie chart securely against accidental touch moves
+            st.plotly_chart(fig_pie, use_container_width=True, config={'staticPlot': True})
 
     # Cross-Tab Heatmap
     st.markdown("<div class='section-title'>⚡ Questionnaire Heatmap Matrix (All Departments Cross-Tabulation View)</div>", unsafe_allow_html=True)
     xtab = pd.crosstab(df['Department'], df['Score'], normalize='index') * 100
     fig_heat = px.imshow(xtab.round(1), text_auto=True, labels=dict(x="Likert Scale Rating Score Profile", y="Department Hub", color="Percentage (%)"), x=['1 (Strongly Disagree)', '2 (Disagree)', '3 (Neutral)', '4 (Agree)', '5 (Strongly Agree)'], color_continuous_scale='Mint', template="plotly_dark")
     fig_heat.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_family="Inter")
-    st.plotly_chart(fig_heat, use_container_width=True)
+    
+    # Lock the heatmap layout cleanly
+    st.plotly_chart(fig_heat, use_container_width=True, config={'staticPlot': True})
 
 # ==========================================
-# VIEW 2: INTERACTIVE SURVEY INTAKE (REALTIME WRITE)
+# VIEW 2: INTERACTIVE SURVEY INTAKE
 # ==========================================
 with tab_survey:
     st.markdown("<div class='section-title'>📝 Live Questionnaire Engine</div>", unsafe_allow_html=True)
-    st.markdown("<p style='color:#94A3B8;'>Select an evaluation scope target below to draw out its current quality criteria framework matrix maps directly.</p>", unsafe_allow_html=True)
     
     col_surv_dept, col_surv_tenure = st.columns(2)
     with col_surv_dept:
@@ -363,10 +357,7 @@ with tab_survey:
         if incomplete:
             st.error("⚠️ **Incomplete Fields:** Please make sure to provide an interactive rating for all criteria statements before broadcasting.")
         else:
-            # Generate temporary submission UID
             new_respondent_id = f"LIVE_{datetime.now().strftime('%M%S')}_{np.random.randint(100,999)}"
-            
-            # Commit mutations directly into global resource list across active browser sockets
             for q_text, rating_str in survey_responses.items():
                 extracted_score = int(rating_str[0])
                 global_db_reference.append({
@@ -390,10 +381,9 @@ with tab_print:
     st.markdown("<div class='section-title'>🖨️ Document Generation & Share Center</div>", unsafe_allow_html=True)
     
     c_print_1, c_print_2 = st.columns([1, 2])
-    
     with c_print_1:
         st.markdown("### 📄 Print Configuration")
-        enable_print_mode = st.toggle("✨ Activate High-Contrast Print View Mode", value=False, help="Inverts backgrounds to crisp white and clean black ink lines to prevent dark background ink bleeding during print or PDF output exports.")
+        enable_print_mode = st.toggle("✨ Activate High-Contrast Print View Mode", value=False)
         
         if enable_print_mode:
             st.markdown("""
@@ -406,7 +396,7 @@ with tab_print:
                 header, [data-testid="stHeader"] { display: none !important; }
                 </style>
             """, unsafe_allow_html=True)
-            st.info("💡 **Print Mode Active:** Background structures are modified to clean high contrast white paper profiles. Simply press `Ctrl + P` (or `Cmd + P` on Mac) to use your browser's printer profile or generate a clean local .pdf file!")
+            st.info("💡 **Print Mode Active:** Press `Ctrl + P` (or `Cmd + P` on Mac) to save as a clean PDF document.")
         
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("### 📤 Export Raw Consolidated Matrices")
@@ -422,8 +412,6 @@ with tab_print:
         
     with c_print_2:
         st.markdown("### 🔗 Share Snapshot Details")
-        st.markdown("Generate a quick snapshot profile text summary block to send to leadership channels or internal team boards.")
-        
         summary_share_string = f"""--- PIQA FIELD OPERATIONAL SNAPSHOT PROFILE ---
 Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}
 Target Scope Segment: {selected_dept}
@@ -435,4 +423,3 @@ Employee Tenure Profile Mix: {selected_tenure}
 ---------------------------------------------"""
         
         st.text_area("📋 Copy Distribution Summary Block:", value=summary_share_string, height=200)
-        st.caption("Select all text inside the block above to quickly share snapshot findings on internal messaging platforms or notification emails.")
