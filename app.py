@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import json
+import os
 from datetime import datetime
 
 # ==========================================
@@ -183,16 +184,32 @@ emoji_options = ["1 🤬", "2 🙁", "3 😐", "4 🙂", "5 🤩"]
 emoji_map = {1: "🤬", 2: "🙁", 3: "😐", 4: "🙂", 5: "🤩"}
 
 # ==========================================
-# 3. GLOBAL FRESH SLATE REAL-TIME DATA HUB
+# 3. PERSISTENT JSON FILE-BASED STORAGE
 # ==========================================
-@st.cache_resource
-def get_global_realtime_database():
-    """Initializes a blank dataset container. Previous historical seed records are removed."""
-    records = []
-    return records
+DB_FILE = "piqa_database.json"
 
-global_db_reference = get_global_realtime_database()
-df = pd.DataFrame(global_db_reference)
+def load_persistent_database():
+    """Loads database records directly from a flat JSON file to maintain state across restarts."""
+    if os.path.exists(DB_FILE):
+        try:
+            with open(DB_FILE, "r") as f:
+                return json.load(f)
+        except Exception as e:
+            st.error(f"Error reading database file: {e}")
+            return []
+    return []
+
+def save_persistent_database(records):
+    """Writes the updated array directly to the persistent JSON layout file."""
+    try:
+        with open(DB_FILE, "w") as f:
+            json.dump(records, f, indent=4)
+    except Exception as e:
+        st.error(f"Error saving data to database file: {e}")
+
+# Load the data directly on every run to guarantee accuracy
+global_records = load_persistent_database()
+df = pd.DataFrame(global_records)
 
 # Title Banner
 st.markdown("<h1>PIQA Matrix Interface Portal</h1>", unsafe_allow_html=True)
@@ -227,7 +244,10 @@ with st.sidebar:
     st.markdown("<hr style='border-color: #1E293B;'/>", unsafe_allow_html=True)
     st.markdown("<b style='color:#FBBF24; font-size: 0.95rem;'>🔄 Reset Workspace</b>", unsafe_allow_html=True)
     
-    if st.button("Reset Matrix Framework", type="secondary", use_container_width=True):
+    # Reset deletes the file database and clears session state completely
+    if st.button("Reset Matrix Framework (Clear All Storage)", type="secondary", use_container_width=True):
+        if os.path.exists(DB_FILE):
+            os.remove(DB_FILE)
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.rerun()
@@ -312,11 +332,10 @@ with tab_dash:
             fig_pie.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_family="Inter")
             st.plotly_chart(fig_pie, use_container_width=True, config={'staticPlot': True})
 
-    # Cross-Tab Heatmap (CRASH-PROOF GATE)
+    # Cross-Tab Heatmap
     st.markdown("<div class='section-title'>⚡ Questionnaire Heatmap Matrix (All Departments Cross-Tabulation View)</div>", unsafe_allow_html=True)
     if not df.empty:
         xtab = pd.crosstab(df['Department'], df['Score'], normalize='index') * 100
-        # Dynamically map missing scale scores to guarantee 5 columns exist
         for i in [1, 2, 3, 4, 5]:
             if i not in xtab.columns:
                 xtab[i] = 0.0
@@ -361,9 +380,11 @@ with tab_survey:
             st.error("⚠️ **Incomplete Fields:** Please make sure to provide an interactive rating for all criteria statements before broadcasting.")
         else:
             new_respondent_id = f"LIVE_{datetime.now().strftime('%M%S')}_{np.random.randint(100,999)}"
+            
+            # Form entries are appended to the list, then committed to file storage instantly
             for q_text, rating_str in survey_responses.items():
                 extracted_score = int(rating_str[0])
-                global_db_reference.append({
+                global_records.append({
                     "RespondentID": new_respondent_id,
                     "Department": survey_dept,
                     "Question Number": "Live Update",
@@ -373,8 +394,11 @@ with tab_survey:
                     "Sentiment": "Positive" if extracted_score > 3 else ("Neutral" if extracted_score == 3 else "Negative"),
                     "Tenure": survey_tenure
                 })
+            
+            # Commit changes directly to disk to ensure data stays put
+            save_persistent_database(global_records)
                 
-            st.success("🎉 **Feedback Synchronized Globally!** Survey data points appended to cluster memory. Switch tabs to view updated metric computations instantly.")
+            st.success("🎉 **Feedback Synchronized Globally!** Survey data points appended to disk storage. Switch tabs to view updated metric computations instantly.")
             st.rerun()
 
 # ==========================================
